@@ -268,20 +268,20 @@
 		{/each}
 	</select>
 	<CaixaSelect
-		name="procedimento"
-		opcoes={opcoesFiltroProcedimento}
-		value={data.filtros.procedimento}
-		placeholder="Todos os procedimentos"
-		buscaPlaceholder="Pesquisar BO / IP / TCO..."
-		onchange={(val) => filtrarPorProcedimento(val)}
-	/>
-	<CaixaSelect
 		name="caixa"
 		opcoes={opcoesFiltroCaixa}
 		value={data.filtros.caixa}
 		placeholder="Todas as caixas"
 		buscaPlaceholder="Pesquisar nome da caixa..."
 		onchange={(val) => filtrarPorCaixa(val)}
+	/>
+	<CaixaSelect
+		name="procedimento"
+		opcoes={opcoesFiltroProcedimento}
+		value={data.filtros.procedimento}
+		placeholder="Todos os procedimentos"
+		buscaPlaceholder="Pesquisar BO / IP / TCO..."
+		onchange={(val) => filtrarPorProcedimento(val)}
 	/>
 	<button type="submit">Filtrar</button>
 	{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento}
