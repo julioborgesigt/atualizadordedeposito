@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { ensureSchema } from '$lib/server/db';
 
 const STATUS_VALIDOS = new Set([
 	'EM_DEPOSITO',
@@ -13,6 +14,7 @@ const STATUS_VALIDOS = new Set([
 export const PATCH: RequestHandler = async ({ params, request, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB não configurado.');
+	await ensureSchema(db);
 
 	const id = Number(params.id);
 	if (!Number.isInteger(id)) throw error(400, 'ID inválido.');

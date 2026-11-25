@@ -1,9 +1,14 @@
 name = "custodia-pcce"
-compatibility_date = "2026-01-01"
-pages_build_output_dir = ".svelte-kit/cloudflare"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+binding = "ASSETS"
+directory = ".svelte-kit/cloudflare"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "custodia-pcce-db"
-database_id = "SUBSTITUA_PELO_SEU_DATABASE_ID"
+database_id = "61d81b8c-b030-4638-99e6-9c53255d1abd"
 migrations_dir = "migrations"

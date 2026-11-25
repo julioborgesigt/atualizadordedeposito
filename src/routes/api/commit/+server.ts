@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { PreviewDocumento, TipoProcedimento } from '$lib/types';
+import { ensureSchema } from '$lib/server/db';
 
 interface CommitPayload {
 	caixaNome: string | null;
@@ -42,6 +43,7 @@ async function obterOuCriarProcedimento(
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB (Cloudflare D1) não configurado.');
+	await ensureSchema(db);
 
 	const payload = (await request.json()) as CommitPayload;
 	const docsValidos = payload.documentos.filter((d) => !d.jaImportado);

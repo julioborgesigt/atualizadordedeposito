@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "db:migrate:local": "wrangler d1 migrations apply custodia-pcce-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply custodia-pcce-db --remote",
-    "deploy": "npm run build && wrangler pages deploy .svelte-kit/cloudflare"
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "pdfjs-dist": "^4.10.38"

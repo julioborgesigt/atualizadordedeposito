@@ -1,5 +1,6 @@
 import type { PageServerLoad } from './$types';
 import type { StatusBem } from '$lib/types';
+import { ensureSchema } from '$lib/server/db';
 
 export interface BemLista {
 	id: number;
@@ -27,6 +28,8 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			filtros: { q: '', status: '', caixa: '' }
 		};
 	}
+
+	await ensureSchema(db);
 
 	const q = url.searchParams.get('q')?.trim() ?? '';
 	const status = url.searchParams.get('status')?.trim() ?? '';

@@ -2,10 +2,12 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { DocumentoParseado, PreviewDocumento } from '$lib/types';
 import { conciliarRestituicao, type CandidatoBem } from '$lib/server/matcher';
+import { ensureSchema } from '$lib/server/db';
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB (Cloudflare D1) não configurado.');
+	await ensureSchema(db);
 
 	const { documentos } = (await request.json()) as { documentos: DocumentoParseado[] };
 	if (!Array.isArray(documentos) || documentos.length === 0) {
