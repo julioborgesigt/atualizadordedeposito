@@ -492,7 +492,27 @@
 						</td>
 						<td class="col-actions">
 							<div class="actions-row">
-								<a href="/?procedimento={doc.proc_id}" class="btn-action link">Ver procedimento</a>
+								<a
+									href="/?procedimento={doc.proc_id}"
+									class="btn-action icon-btn link"
+									title="Ver procedimento ({doc.proc_tipo} {doc.proc_numero})"
+									aria-label="Ver procedimento"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+										<circle cx="12" cy="12" r="3" />
+									</svg>
+								</a>
 								<button
 									type="button"
 									class="btn-action danger"
@@ -836,6 +856,10 @@
 	}
 	.btn-action:hover {
 		background: #f1f5f9;
+	}
+	.btn-action.icon-btn {
+		padding: 0.38rem 0.52rem;
+		justify-content: center;
 	}
 	.btn-action.link {
 		background: #eff6ff;
