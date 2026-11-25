@@ -485,8 +485,7 @@
 		font-weight: 600;
 		margin-bottom: 0.35rem;
 	}
-	.field input,
-	.field select {
+	.field input {
 		width: 100%;
 		max-width: none;
 		box-sizing: border-box;
