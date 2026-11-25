@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
+	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
 
 	let { data } = $props();
 
@@ -26,6 +27,25 @@
 	let novaCaixaGerenciador = $state('');
 	let editandoCaixaId = $state<number | null>(null);
 	let editandoCaixaNome = $state('');
+
+	const opcoesFiltroCaixa = $derived([
+		{ value: '', label: `Todas as caixas (${data.contadores.total})` },
+		{ value: '__SEM_CAIXA__', label: `Sem caixa (${data.contadores.semCaixa})` },
+		...data.caixas.map((cx) => ({
+			value: String(cx.id),
+			label: `${cx.nome} (${cx.total_bens})`
+		}))
+	]);
+
+	const opcoesMoverLoteCaixa = $derived([
+		{ value: '', label: 'Mover selecionados para caixa...' },
+		{ value: '__NOVA__', label: '+ Criar nova caixa e mover...' },
+		{ value: '__SEM_CAIXA__', label: '-- Remover da caixa (Sem caixa) --' },
+		...data.caixas.map((cx) => ({
+			value: String(cx.id),
+			label: `Caixa: ${cx.nome} (${cx.total_bens})`
+		}))
+	]);
 
 	const todosSelecionados = $derived(
 		data.bens.length > 0 && data.bens.every((b) => selecionados.includes(b.id))
@@ -452,36 +472,6 @@
 	</section>
 {/if}
 
-<div class="caixas-strip">
-	<span class="strip-label">Separação por Caixa:</span>
-	<button
-		type="button"
-		class="caixa-pill"
-		class:active={data.filtros.caixa === ''}
-		onclick={() => filtrarPorCaixa('')}
-	>
-		Todas ({data.contadores.total})
-	</button>
-	{#each data.caixas as cx (cx.id)}
-		<button
-			type="button"
-			class="caixa-pill"
-			class:active={data.filtros.caixa === String(cx.id)}
-			onclick={() => filtrarPorCaixa(String(cx.id))}
-		>
-			{cx.nome} ({cx.total_bens})
-		</button>
-	{/each}
-	<button
-		type="button"
-		class="caixa-pill"
-		class:active={data.filtros.caixa === '__SEM_CAIXA__'}
-		onclick={() => filtrarPorCaixa('__SEM_CAIXA__')}
-	>
-		Sem caixa ({data.contadores.semCaixa})
-	</button>
-</div>
-
 <form method="GET" class="filtros">
 	<input
 		type="search"
@@ -495,13 +485,14 @@
 			<option value={st.value}>{st.label}</option>
 		{/each}
 	</select>
-	<select name="caixa" value={data.filtros.caixa} onchange={(e) => e.currentTarget.form?.requestSubmit()}>
-		<option value="">Todas as caixas</option>
-		<option value="__SEM_CAIXA__">Sem caixa ({data.contadores.semCaixa})</option>
-		{#each data.caixas as cx}
-			<option value={String(cx.id)}>{cx.nome} ({cx.total_bens})</option>
-		{/each}
-	</select>
+	<CaixaSelect
+		name="caixa"
+		opcoes={opcoesFiltroCaixa}
+		value={data.filtros.caixa}
+		placeholder="Todas as caixas"
+		buscaPlaceholder="Pesquisar nome da caixa..."
+		onchange={(val) => filtrarPorCaixa(val)}
+	/>
 	<button type="submit">Filtrar</button>
 	{#if data.filtros.q || data.filtros.status || data.filtros.caixa}
 		<a href="/" class="btn-clear">Limpar filtros</a>
@@ -516,14 +507,12 @@
 
 		<div class="bulk-actions">
 			<div class="bulk-group">
-				<select bind:value={destinoLoteCaixa}>
-					<option value="">Mover selecionados para caixa...</option>
-					<option value="__NOVA__">+ Criar nova caixa e mover...</option>
-					<option value="__SEM_CAIXA__">-- Remover da caixa (Sem caixa) --</option>
-					{#each data.caixas as cx}
-						<option value={String(cx.id)}>Caixa: {cx.nome}</option>
-					{/each}
-				</select>
+				<CaixaSelect
+					opcoes={opcoesMoverLoteCaixa}
+					bind:value={destinoLoteCaixa}
+					placeholder="Mover selecionados para caixa..."
+					buscaPlaceholder="Pesquisar caixa de destino..."
+				/>
 				{#if destinoLoteCaixa === '__NOVA__'}
 					<input
 						type="text"
@@ -844,39 +833,6 @@
 		background: #fee2e2;
 		color: #b91c1c;
 		border-color: #fecaca;
-	}
-	.caixas-strip {
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-		flex-wrap: wrap;
-		margin-bottom: 0.9rem;
-		background: #fff;
-		padding: 0.65rem 0.85rem;
-		border-radius: 8px;
-		border: 1px solid #e2e8f0;
-	}
-	.strip-label {
-		font-size: 0.82rem;
-		font-weight: 700;
-		color: #475569;
-		margin-right: 0.25rem;
-	}
-	.caixa-pill {
-		background: #f1f5f9;
-		color: #334155;
-		border: 1px solid #cbd5e1;
-		border-radius: 999px;
-		padding: 0.32rem 0.75rem;
-		font-size: 0.8rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.caixa-pill.active,
-	.caixa-pill:hover {
-		background: #2563eb;
-		color: #fff;
-		border-color: #2563eb;
 	}
 	.filtros {
 		display: flex;

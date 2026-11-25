@@ -3,6 +3,7 @@
 	import { extrairTextoPdf } from '$lib/pdf/extractText';
 	import { parseRelatorioPdf } from '$lib/pdf/parser';
 	import type { DocumentoParseado, PreviewDocumento } from '$lib/types';
+	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
 
 	let { data } = $props();
 
@@ -27,6 +28,13 @@
 			}
 		}
 	});
+
+	const opcoesCaixasExistentes = $derived(
+		caixasExistentes.map((cx) => ({
+			value: cx.nome,
+			label: `${cx.nome}${cx.total_bens !== undefined ? ` (${cx.total_bens} bem/bens)` : ''}`
+		}))
+	);
 
 	const caixaFinal = $derived(
 		modoCaixa === 'EXISTENTE'
@@ -181,14 +189,12 @@
 		{#if modoCaixa === 'EXISTENTE'}
 			<div class="field">
 				<label for="select-caixa-existente">Selecione a caixa existente *</label>
-				<select id="select-caixa-existente" bind:value={caixaExistenteNome}>
-					<option value="">-- Escolha uma caixa --</option>
-					{#each caixasExistentes as cx}
-						<option value={cx.nome}>
-							{cx.nome} {cx.total_bens !== undefined ? `(${cx.total_bens} bem/bens)` : ''}
-						</option>
-					{/each}
-				</select>
+				<CaixaSelect
+					opcoes={opcoesCaixasExistentes}
+					bind:value={caixaExistenteNome}
+					placeholder="-- Escolha uma caixa --"
+					buscaPlaceholder="Pesquisar nome da caixa..."
+				/>
 			</div>
 		{:else if modoCaixa === 'NOVA'}
 			<div class="field">
