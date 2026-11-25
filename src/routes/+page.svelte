@@ -583,7 +583,6 @@
 				</th>
 				<th>Procedimento</th>
 				<th>Bem / Descrição</th>
-				<th>ID Único</th>
 				<th>Saldo</th>
 				<th>Caixa</th>
 				<th>Status</th>
@@ -593,7 +592,7 @@
 		<tbody>
 			{#if data.bens.length === 0}
 				<tr>
-					<td colspan="8" class="empty">
+					<td colspan="7" class="empty">
 						Nenhum bem encontrado para este filtro. <a href="/importar">Importar lote de PDFs</a>.
 					</td>
 				</tr>
@@ -617,7 +616,6 @@
 						<div class="cat">{bem.categoria}</div>
 						<div>{bem.descricao_original}</div>
 					</td>
-					<td><code>{bem.identificador_unico ?? '-'}</code></td>
 					<td>{bem.qtd_disponivel} / {bem.qtd_total} {bem.unidade}</td>
 					<td>
 						<select

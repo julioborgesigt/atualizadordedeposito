@@ -294,7 +294,6 @@
 							<th style="width:40px">Ok</th>
 							<th>Categoria</th>
 							<th>Descrição extraída</th>
-							<th>ID Único</th>
 							<th>Qtd</th>
 							<th>Previsão pós-lote</th>
 						</tr>
@@ -305,7 +304,6 @@
 								<td><input type="checkbox" bind:checked={entry.incluir} /></td>
 								<td>{entry.item.categoria}</td>
 								<td>{entry.item.descricaoOriginal}</td>
-								<td>{entry.item.identificadorUnico ?? '-'}</td>
 								<td>{entry.item.quantidade} {entry.item.unidade}</td>
 								<td>
 									{#if entry.seraRestituidoNoLote}
