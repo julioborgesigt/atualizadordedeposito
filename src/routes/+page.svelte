@@ -512,7 +512,6 @@
 	<div class="bulk-bar">
 		<div class="bulk-count">
 			<strong>{selecionados.length}</strong> item(ns) selecionado(s)
-			<button type="button" class="btn-link" onclick={() => (selecionados = [])}>Desmarcar</button>
 		</div>
 
 		<div class="bulk-actions">
@@ -542,6 +541,8 @@
 				</button>
 			</div>
 
+			<span class="bulk-sep">Ou</span>
+
 			<div class="bulk-group">
 				<select bind:value={statusLote}>
 					<option value="">Alterar status...</option>
@@ -558,6 +559,8 @@
 					Aplicar Status
 				</button>
 			</div>
+
+			<span class="bulk-sep">Ou</span>
 
 			<button
 				type="button"
@@ -926,13 +929,11 @@
 		gap: 0.6rem;
 		font-size: 0.9rem;
 	}
-	.btn-link {
-		background: transparent;
-		border: none;
-		color: #93c5fd;
-		text-decoration: underline;
-		cursor: pointer;
-		font-size: 0.82rem;
+	.bulk-sep {
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: #94a3b8;
+		padding: 0 0.15rem;
 	}
 	.bulk-actions {
 		display: flex;
