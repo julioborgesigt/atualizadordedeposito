@@ -14,7 +14,6 @@
 	];
 
 	let selecionados = $state<number[]>([]);
-	let mostrarGerenciador = $state(false);
 	let processandoLote = $state(false);
 	let feedback = $state<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
 
@@ -22,11 +21,6 @@
 	let destinoLoteCaixa = $state<string>('');
 	let nomeNovaCaixaLote = $state('');
 	let statusLote = $state('');
-
-	// Estados do gerenciador de caixas
-	let novaCaixaGerenciador = $state('');
-	let editandoCaixaId = $state<number | null>(null);
-	let editandoCaixaNome = $state('');
 
 	const opcoesFiltroCaixa = $derived([
 		{ value: '', label: `Todas as caixas (${data.contadores.total})` },
@@ -232,150 +226,24 @@
 			processandoLote = false;
 		}
 	}
-
-	async function criarNovaCaixa() {
-		const nome = novaCaixaGerenciador.trim();
-		if (!nome) return;
-		feedback = null;
-		try {
-			const res = await fetch('/api/caixas', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ nome })
-			});
-			if (!res.ok) {
-				const err = (await res.json().catch(() => ({}))) as { message?: string };
-				throw new Error(err.message || 'Erro ao criar caixa.');
-			}
-			novaCaixaGerenciador = '';
-			feedback = { tipo: 'ok', texto: `Caixa "${nome}" criada com sucesso.` };
-			await invalidateAll();
-		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao criar caixa.'
-			};
-		}
-	}
-
-	async function salvarRenomearCaixa(id: number) {
-		const nome = editandoCaixaNome.trim();
-		if (!nome) return;
-		feedback = null;
-		try {
-			const res = await fetch('/api/caixas', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ id, nome })
-			});
-			if (!res.ok) {
-				const err = (await res.json().catch(() => ({}))) as { message?: string };
-				throw new Error(err.message || 'Erro ao renomear caixa.');
-			}
-			editandoCaixaId = null;
-			editandoCaixaNome = '';
-			feedback = { tipo: 'ok', texto: 'Nome da caixa atualizado.' };
-			await invalidateAll();
-		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao renomear caixa.'
-			};
-		}
-	}
-
-	async function excluirCaixa(id: number, nome: string, totalBens: number, excluirBensJunto: boolean) {
-		const msg = excluirBensJunto
-			? `ATENÇÃO: Deseja excluir a caixa "${nome}" E TAMBÉM EXCLUIR os ${totalBens} bem(ns) dentro dela?`
-			: totalBens > 0
-				? `Deseja excluir a caixa "${nome}"? Os ${totalBens} bem(ns) serão mantidos no sistema como "Sem caixa".`
-				: `Deseja excluir a caixa vazia "${nome}"?`;
-
-		if (!confirm(msg)) return;
-
-		feedback = null;
-		try {
-			const res = await fetch('/api/caixas', {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					id,
-					acaoBens: excluirBensJunto ? 'EXCLUIR' : 'DESVINCULAR'
-				})
-			});
-			if (!res.ok) throw new Error('Erro ao excluir caixa.');
-
-			if (data.filtros.caixa === String(id)) {
-				filtrarPorCaixa('');
-			} else {
-				await invalidateAll();
-			}
-			feedback = { tipo: 'ok', texto: `Caixa "${nome}" excluída.` };
-		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao excluir caixa.'
-			};
-		}
-	}
-
-	async function excluirApreensaoInteira(docId: number, procLabel: string, nomeArquivo: string, qtdBens: number) {
-		const confirmar = confirm(
-			`Confirma a exclusão da apreensão "${procLabel}" (${nomeArquivo}) e de seus ${qtdBens} bem(ns)? O PDF poderá ser importado novamente depois.`
-		);
-		if (!confirmar) return;
-
-		feedback = null;
-		try {
-			const res = await fetch(`/api/documentos/${docId}`, {
-				method: 'DELETE'
-			});
-			if (!res.ok) throw new Error('Falha ao excluir apreensão.');
-
-			selecionados = [];
-			feedback = {
-				tipo: 'ok',
-				texto: `Apreensão ${procLabel} (${nomeArquivo}) excluída com sucesso.`
-			};
-			await invalidateAll();
-		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao excluir apreensão.'
-			};
-		}
-	}
 </script>
 
-<div class="top-row">
-	<div class="kpis">
-		<div class="kpi">
-			<span>Total de Bens</span>
-			<strong>{data.contadores.total}</strong>
-		</div>
-		<div class="kpi amber">
-			<span>Em Depósito</span>
-			<strong>{data.contadores.emDeposito}</strong>
-		</div>
-		<div class="kpi green">
-			<span>Restituídos</span>
-			<strong>{data.contadores.restituidos}</strong>
-		</div>
-		<div class="kpi purple">
-			<span>Caixas Físicas</span>
-			<strong>{data.caixas.length}</strong>
-		</div>
+<div class="kpis">
+	<div class="kpi">
+		<span>Total de Bens</span>
+		<strong>{data.contadores.total}</strong>
 	</div>
-
-	<div class="top-actions">
-		<button
-			type="button"
-			class="btn-manage"
-			class:active={mostrarGerenciador}
-			onclick={() => (mostrarGerenciador = !mostrarGerenciador)}
-		>
-			{mostrarGerenciador ? 'Fechar Gerenciador' : 'Gerenciar Caixas e Apreensões'}
-		</button>
+	<div class="kpi amber">
+		<span>Em Depósito</span>
+		<strong>{data.contadores.emDeposito}</strong>
+	</div>
+	<div class="kpi green">
+		<span>Restituídos</span>
+		<strong>{data.contadores.restituidos}</strong>
+	</div>
+	<div class="kpi purple">
+		<span>Caixas Físicas</span>
+		<strong>{data.caixas.length}</strong>
 	</div>
 </div>
 
@@ -384,129 +252,6 @@
 		<span>{feedback.texto}</span>
 		<button type="button" class="close-btn" onclick={() => (feedback = null)}>×</button>
 	</div>
-{/if}
-
-{#if mostrarGerenciador}
-	<section class="gerenciador-panel">
-		<div class="gerenciador-grid">
-			<div class="gerenciador-col">
-				<h3>Gerenciar Caixas Físicas</h3>
-				<div class="criar-caixa-bar">
-					<input
-						type="text"
-						bind:value={novaCaixaGerenciador}
-						placeholder="Nome da nova caixa (ex: Caixa 02 - Armas/Objetos)"
-						onkeydown={(e) => e.key === 'Enter' && criarNovaCaixa()}
-					/>
-					<button type="button" onclick={criarNovaCaixa}>+ Criar Caixa</button>
-				</div>
-
-				{#if data.caixas.length === 0}
-					<p class="muted">Nenhuma caixa cadastrada ainda.</p>
-				{:else}
-					<ul class="lista-gerenciador">
-						{#each data.caixas as cx (cx.id)}
-							<li>
-								{#if editandoCaixaId === cx.id}
-									<div class="inline-edit">
-										<input type="text" bind:value={editandoCaixaNome} />
-										<button type="button" class="btn-sm primary" onclick={() => salvarRenomearCaixa(cx.id)}>
-											Salvar
-										</button>
-										<button type="button" class="btn-sm" onclick={() => (editandoCaixaId = null)}>
-											Cancelar
-										</button>
-									</div>
-								{:else}
-									<div class="item-info">
-										<strong>{cx.nome}</strong>
-										<span class="muted">{cx.total_bens} bem(ns) ({cx.em_deposito} em depósito)</span>
-									</div>
-									<div class="item-btns">
-										<button
-											type="button"
-											class="btn-sm"
-											onclick={() => filtrarPorCaixa(String(cx.id))}
-										>
-											Ver itens
-										</button>
-										<button
-											type="button"
-											class="btn-sm"
-											onclick={() => {
-												editandoCaixaId = cx.id;
-												editandoCaixaNome = cx.nome;
-											}}
-										>
-											Renomear
-										</button>
-										<button
-											type="button"
-											class="btn-sm warn"
-											onclick={() => excluirCaixa(cx.id, cx.nome, cx.total_bens, false)}
-											title="Exclui apenas a caixa e mantém os bens sem caixa"
-										>
-											Excluir caixa
-										</button>
-										{#if cx.total_bens > 0}
-											<button
-												type="button"
-												class="btn-sm danger"
-												onclick={() => excluirCaixa(cx.id, cx.nome, cx.total_bens, true)}
-												title="Exclui a caixa e todos os bens dentro dela"
-											>
-												Excluir caixa + bens
-											</button>
-										{/if}
-									</div>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</div>
-
-			<div class="gerenciador-col">
-				<h3>Documentos Importados (Apreensões e Restituições)</h3>
-				{#if data.apreensoes.length === 0}
-					<p class="muted">Nenhum documento importado até o momento.</p>
-				{:else}
-					<ul class="lista-gerenciador">
-						{#each data.apreensoes as ap (ap.id)}
-							<li>
-								<div class="item-info">
-									<strong>
-										[{ap.doc_tipo === 'APREENSAO' ? 'APREENSÃO' : 'RESTITUIÇÃO'}] {ap.proc_tipo} {ap.proc_numero}
-									</strong>
-									<span class="muted">
-										{ap.nome_arquivo} • {ap.data_ato ?? 'Sem data'} • {ap.qtd_bens} bem(ns)
-										{#if ap.caixas_nomes}
-											• Caixa(s): {ap.caixas_nomes}
-										{/if}
-									</span>
-								</div>
-								<div class="item-btns">
-									<button
-										type="button"
-										class="btn-sm danger"
-										onclick={() =>
-											excluirApreensaoInteira(
-												ap.id,
-												`${ap.proc_tipo} ${ap.proc_numero}`,
-												ap.nome_arquivo,
-												ap.qtd_bens
-											)}
-									>
-										Excluir {ap.doc_tipo === 'APREENSAO' ? 'Apreensão' : 'Restituição'}
-									</button>
-								</div>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</div>
-		</div>
-	</section>
 {/if}
 
 <form method="GET" class="filtros">
@@ -708,19 +453,11 @@
 </div>
 
 <style>
-	.top-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: stretch;
-		gap: 1rem;
-		flex-wrap: wrap;
-		margin-bottom: 1rem;
-	}
 	.kpis {
-		flex: 1;
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 		gap: 0.85rem;
+		margin-bottom: 1rem;
 	}
 	.kpi {
 		background: #fff;
@@ -746,26 +483,6 @@
 	.kpi strong {
 		font-size: 1.65rem;
 	}
-	.top-actions {
-		display: flex;
-		align-items: center;
-	}
-	.btn-manage {
-		background: #fff;
-		color: #0f172a;
-		border: 1px solid #cbd5e1;
-		padding: 0.7rem 1.1rem;
-		border-radius: 8px;
-		font-weight: 600;
-		cursor: pointer;
-		font-size: 0.88rem;
-	}
-	.btn-manage.active,
-	.btn-manage:hover {
-		background: #0f172a;
-		color: #fff;
-		border-color: #0f172a;
-	}
 	.alert {
 		display: flex;
 		justify-content: space-between;
@@ -790,104 +507,6 @@
 		font-size: 1.2rem;
 		cursor: pointer;
 		color: inherit;
-	}
-	.gerenciador-panel {
-		background: #fff;
-		border: 1px solid #cbd5e1;
-		border-radius: 10px;
-		padding: 1.1rem;
-		margin-bottom: 1.2rem;
-	}
-	.gerenciador-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-		gap: 1.25rem;
-	}
-	.gerenciador-col h3 {
-		margin: 0 0 0.75rem;
-		font-size: 1rem;
-	}
-	.criar-caixa-bar {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 0.85rem;
-	}
-	.criar-caixa-bar input {
-		flex: 1;
-		padding: 0.5rem 0.65rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-	}
-	.criar-caixa-bar button {
-		background: #2563eb;
-		color: #fff;
-		border: none;
-		padding: 0.5rem 0.9rem;
-		border-radius: 6px;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.lista-gerenciador {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		max-height: 260px;
-		overflow-y: auto;
-		border: 1px solid #e2e8f0;
-		border-radius: 8px;
-	}
-	.lista-gerenciador li {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.6rem 0.75rem;
-		border-bottom: 1px solid #e2e8f0;
-		flex-wrap: wrap;
-	}
-	.lista-gerenciador li:last-child {
-		border-bottom: none;
-	}
-	.item-info {
-		display: flex;
-		flex-direction: column;
-		font-size: 0.86rem;
-	}
-	.item-btns,
-	.inline-edit {
-		display: flex;
-		gap: 0.35rem;
-		flex-wrap: wrap;
-		align-items: center;
-	}
-	.inline-edit input {
-		padding: 0.35rem 0.5rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 5px;
-	}
-	.btn-sm {
-		padding: 0.3rem 0.55rem;
-		font-size: 0.76rem;
-		border-radius: 5px;
-		border: 1px solid #cbd5e1;
-		background: #f8fafc;
-		cursor: pointer;
-		font-weight: 600;
-	}
-	.btn-sm.primary {
-		background: #2563eb;
-		color: #fff;
-		border-color: #2563eb;
-	}
-	.btn-sm.warn {
-		background: #fef3c7;
-		color: #92400e;
-		border-color: #fde68a;
-	}
-	.btn-sm.danger {
-		background: #fee2e2;
-		color: #b91c1c;
-		border-color: #fecaca;
 	}
 	.filtros {
 		display: flex;

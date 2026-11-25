@@ -11,6 +11,9 @@
 		</div>
 		<nav>
 			<a href="/" class:active={page.url.pathname === '/'}>Depósito / Bens</a>
+			<a href="/gerenciar" class:active={page.url.pathname === '/gerenciar'}>
+				Gerenciar Caixas e Apreensões
+			</a>
 			<a href="/importar" class:active={page.url.pathname === '/importar'}>+ Importar PDFs</a>
 		</nav>
 	</header>

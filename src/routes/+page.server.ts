@@ -151,23 +151,6 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		)
 		.all<ProcedimentoDashboard>();
 
-	const { results: apreensoes } = await db
-		.prepare(
-			`SELECT d.id, d.tipo AS doc_tipo, d.nome_arquivo, d.data_ato, d.parte_nome,
-			        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
-			        COUNT(DISTINCT b.id) AS qtd_bens,
-			        GROUP_CONCAT(DISTINCT c.nome) AS caixas_nomes
-			 FROM documentos d
-			 JOIN procedimentos p ON p.id = d.procedimento_id
-			 LEFT JOIN movimentacoes m ON m.documento_id = d.id
-			 LEFT JOIN bens b ON b.id = m.bem_id
-			 LEFT JOIN caixas c ON c.id = b.caixa_id
-			 GROUP BY d.id
-			 ORDER BY d.importado_em DESC, d.id DESC
-			 LIMIT 50`
-		)
-		.all<ApreensaoDashboard>();
-
 	const stats = await db
 		.prepare(
 			`SELECT
@@ -188,7 +171,6 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		bens,
 		caixas,
 		procedimentos,
-		apreensoes,
 		contadores: {
 			total: stats?.total ?? 0,
 			emDeposito: stats?.emDeposito ?? 0,
