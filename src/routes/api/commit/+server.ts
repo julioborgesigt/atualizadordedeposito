@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { PreviewDocumento, TipoProcedimento } from '$lib/types';
-import { ensureSchema } from '$lib/server/db';
+import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 interface CommitPayload {
 	caixaNome: string | null;
@@ -44,6 +44,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB (Cloudflare D1) não configurado.');
 	await ensureSchema(db);
+	await limparResquiciosOrfaos(db);
 
 	const payload = (await request.json()) as CommitPayload;
 	const docsValidos = payload.documentos.filter((d) => !d.jaImportado);
@@ -56,7 +57,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	if (caixaLimpa) {
 		await db.prepare('INSERT OR IGNORE INTO caixas (nome) VALUES (?)').bind(caixaLimpa).run();
 		const rowCaixa = await db
-			.prepare('SELECT id FROM caixas WHERE nome = ?')
+			.prepare('SELECT id FROM caixas WHERE UPPER(nome) = UPPER(?)')
 			.bind(caixaLimpa)
 			.first<{ id: number }>();
 		caixaId = rowCaixa?.id ?? null;
@@ -77,6 +78,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			doc.numeroProcedimento,
 			payload.operacao?.trim() || null
 		);
+
+		// Caso o usuário tenha forçado a reimportação deste hash, remove o registro antigo do documento
+		await db.prepare('DELETE FROM documentos WHERE hash_sha256 = ?').bind(doc.hashSha256).run();
 
 		const resDoc = await db
 			.prepare(
@@ -146,6 +150,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			payload.operacao?.trim() || null
 		);
 
+		await db.prepare('DELETE FROM documentos WHERE hash_sha256 = ?').bind(doc.hashSha256).run();
+
 		const resDoc = await db
 			.prepare(
 				`INSERT INTO documentos
@@ -176,10 +182,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						`INSERT INTO bens
 						 (procedimento_id, caixa_id, categoria, descricao_original, descricao_normalizada,
 						  tipo_identificador, identificador_unico, qtd_total, qtd_disponivel, unidade, status)
-						 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 0, ?, 'RESTITUIDO')`
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'RESTITUIDO')`
 					)
 					.bind(
 						procId,
+						caixaId,
 						it.categoria,
 						it.descricaoOriginal,
 						it.descricaoNormalizada,

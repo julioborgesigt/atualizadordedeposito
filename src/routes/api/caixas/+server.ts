@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { ensureSchema } from '$lib/server/db';
+import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ platform }) => {
 	const db = platform?.env?.DB;
@@ -119,6 +119,10 @@ export const DELETE: RequestHandler = async ({ request, platform }) => {
 	const acao = body.acaoBens ?? 'DESVINCULAR';
 
 	if (acao === 'EXCLUIR') {
+		await db
+			.prepare('DELETE FROM movimentacoes WHERE bem_id IN (SELECT id FROM bens WHERE caixa_id = ?)')
+			.bind(id)
+			.run();
 		await db.prepare('DELETE FROM bens WHERE caixa_id = ?').bind(id).run();
 	} else if (acao === 'MOVER') {
 		const destino = body.destinoCaixaId ? Number(body.destinoCaixaId) : null;
@@ -137,6 +141,7 @@ export const DELETE: RequestHandler = async ({ request, platform }) => {
 	}
 
 	await db.prepare('DELETE FROM caixas WHERE id = ?').bind(id).run();
+	await limparResquiciosOrfaos(db);
 
 	return json({ ok: true });
 };

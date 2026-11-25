@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import type { StatusBem } from '$lib/types';
-import { ensureSchema } from '$lib/server/db';
+import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 export interface BemLista {
 	id: number;
@@ -28,6 +28,7 @@ export interface CaixaDashboard {
 
 export interface ApreensaoDashboard {
 	id: number;
+	doc_tipo: string;
 	nome_arquivo: string;
 	data_ato: string | null;
 	parte_nome: string | null;
@@ -51,6 +52,7 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 	}
 
 	await ensureSchema(db);
+	await limparResquiciosOrfaos(db);
 
 	const q = url.searchParams.get('q')?.trim() ?? '';
 	const status = url.searchParams.get('status')?.trim() ?? '';
@@ -125,16 +127,15 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 
 	const { results: apreensoes } = await db
 		.prepare(
-			`SELECT d.id, d.nome_arquivo, d.data_ato, d.parte_nome,
+			`SELECT d.id, d.tipo AS doc_tipo, d.nome_arquivo, d.data_ato, d.parte_nome,
 			        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
 			        COUNT(DISTINCT b.id) AS qtd_bens,
 			        GROUP_CONCAT(DISTINCT c.nome) AS caixas_nomes
 			 FROM documentos d
 			 JOIN procedimentos p ON p.id = d.procedimento_id
-			 LEFT JOIN movimentacoes m ON m.documento_id = d.id AND m.tipo_evento = 'APREENSAO'
+			 LEFT JOIN movimentacoes m ON m.documento_id = d.id
 			 LEFT JOIN bens b ON b.id = m.bem_id
 			 LEFT JOIN caixas c ON c.id = b.caixa_id
-			 WHERE d.tipo = 'APREENSAO'
 			 GROUP BY d.id
 			 ORDER BY d.importado_em DESC, d.id DESC
 			 LIMIT 50`

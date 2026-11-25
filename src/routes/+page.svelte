@@ -410,15 +410,17 @@
 			</div>
 
 			<div class="gerenciador-col">
-				<h3>Apreensões Importadas (Excluir Apreensão)</h3>
+				<h3>Documentos Importados (Apreensões e Restituições)</h3>
 				{#if data.apreensoes.length === 0}
-					<p class="muted">Nenhum auto de apreensão importado até o momento.</p>
+					<p class="muted">Nenhum documento importado até o momento.</p>
 				{:else}
 					<ul class="lista-gerenciador">
 						{#each data.apreensoes as ap (ap.id)}
 							<li>
 								<div class="item-info">
-									<strong>{ap.proc_tipo} {ap.proc_numero}</strong>
+									<strong>
+										[{ap.doc_tipo === 'APREENSAO' ? 'APREENSÃO' : 'RESTITUIÇÃO'}] {ap.proc_tipo} {ap.proc_numero}
+									</strong>
 									<span class="muted">
 										{ap.nome_arquivo} • {ap.data_ato ?? 'Sem data'} • {ap.qtd_bens} bem(ns)
 										{#if ap.caixas_nomes}
@@ -438,7 +440,7 @@
 												ap.qtd_bens
 											)}
 									>
-										Excluir Apreensão
+										Excluir {ap.doc_tipo === 'APREENSAO' ? 'Apreensão' : 'Restituição'}
 									</button>
 								</div>
 							</li>

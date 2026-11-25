@@ -2,12 +2,13 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { DocumentoParseado, PreviewDocumento } from '$lib/types';
 import { conciliarRestituicao, type CandidatoBem } from '$lib/server/matcher';
-import { ensureSchema } from '$lib/server/db';
+import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB (Cloudflare D1) não configurado.');
 	await ensureSchema(db);
+	await limparResquiciosOrfaos(db);
 
 	const { documentos } = (await request.json()) as { documentos: DocumentoParseado[] };
 	if (!Array.isArray(documentos) || documentos.length === 0) {
@@ -91,7 +92,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						qtdDisponivel: item.quantidade
 					});
 				}
-				return { tempKey, incluir: !jaImportado, item, seraRestituidoNoLote: false };
+				return { tempKey, incluir: true, item, seraRestituidoNoLote: false };
 			});
 
 			poolsPorProc.set(doc.numeroProcedimento, pool);
@@ -111,10 +112,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			label: c.descricaoOriginal
 		}));
 
-		const itensRestituicao = jaImportado ? [] : conciliarRestituicao(doc.itens, pool);
-		for (const match of itensRestituicao) {
-			if (match.alvoKey.startsWith('tmp:')) {
-				tempKeysRestituidasNoLote.add(match.alvoKey);
+		const itensRestituicao = conciliarRestituicao(
+			doc.itens,
+			pool.map((c) => ({ ...c }))
+		);
+
+		if (!jaImportado) {
+			// Aplica a baixa no pool real quando o documento não está marcado como duplicado
+			conciliarRestituicao(doc.itens, pool);
+			for (const match of itensRestituicao) {
+				if (match.alvoKey.startsWith('tmp:')) {
+					tempKeysRestituidasNoLote.add(match.alvoKey);
+				}
 			}
 		}
 

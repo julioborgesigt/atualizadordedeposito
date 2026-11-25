@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { ensureSchema } from '$lib/server/db';
+import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 export const DELETE: RequestHandler = async ({ params, platform }) => {
 	const db = platform?.env?.DB;
@@ -15,32 +15,70 @@ export const DELETE: RequestHandler = async ({ params, platform }) => {
 		.bind(docId)
 		.first<{ id: number; procedimento_id: number; tipo: string; nome_arquivo: string }>();
 
-	if (!doc) throw error(404, 'Documento de apreensão não encontrado.');
+	if (!doc) throw error(404, 'Documento não encontrado.');
 
-	// Exclui os bens vinculados a esta apreensão
-	await db
-		.prepare(
-			`DELETE FROM bens
-			 WHERE id IN (
-			   SELECT bem_id FROM movimentacoes WHERE documento_id = ? AND tipo_evento = 'APREENSAO'
-			 )`
-		)
-		.bind(docId)
-		.run();
+	if (doc.tipo === 'APREENSAO') {
+		// Busca os bens criados nesta apreensão
+		const { results: movs } = await db
+			.prepare('SELECT bem_id FROM movimentacoes WHERE documento_id = ? AND tipo_evento = \'APREENSAO\'')
+			.bind(docId)
+			.all<{ bem_id: number }>();
 
-	// Exclui o documento (libera o hash SHA-256 caso precise reimportar o PDF)
+		const bemIds = movs.map((m) => m.bem_id);
+		if (bemIds.length > 0) {
+			const placeholders = bemIds.map(() => '?').join(',');
+			await db
+				.prepare(`DELETE FROM movimentacoes WHERE bem_id IN (${placeholders})`)
+				.bind(...bemIds)
+				.run();
+			await db
+				.prepare(`DELETE FROM bens WHERE id IN (${placeholders})`)
+				.bind(...bemIds)
+				.run();
+		}
+	} else if (doc.tipo === 'RESTITUICAO') {
+		// Reverte o saldo dos bens restituídos por este termo (ou remove bens criados exclusivamente na restituição)
+		const { results: movsRest } = await db
+			.prepare(
+				'SELECT bem_id, qtd_movimentada FROM movimentacoes WHERE documento_id = ? AND tipo_evento = \'RESTITUICAO\''
+			)
+			.bind(docId)
+			.all<{ bem_id: number; qtd_movimentada: number }>();
+
+		for (const mov of movsRest) {
+			const temApreensao = await db
+				.prepare(
+					'SELECT 1 FROM movimentacoes WHERE bem_id = ? AND tipo_evento = \'APREENSAO\' LIMIT 1'
+				)
+				.bind(mov.bem_id)
+				.first();
+
+			if (!temApreensao) {
+				await db.prepare('DELETE FROM movimentacoes WHERE bem_id = ?').bind(mov.bem_id).run();
+				await db.prepare('DELETE FROM bens WHERE id = ?').bind(mov.bem_id).run();
+			} else {
+				await db
+					.prepare(
+						`UPDATE bens
+						 SET qtd_disponivel = MIN(qtd_total, qtd_disponivel + ?),
+						     status = CASE
+						       WHEN MIN(qtd_total, qtd_disponivel + ?) >= qtd_total THEN 'EM_DEPOSITO'
+						       ELSE 'RESTITUIDO_PARCIAL'
+						     END,
+						     atualizado_em = datetime('now')
+						 WHERE id = ?`
+					)
+					.bind(mov.qtd_movimentada, mov.qtd_movimentada, mov.bem_id)
+					.run();
+			}
+		}
+
+		await db.prepare('DELETE FROM movimentacoes WHERE documento_id = ?').bind(docId).run();
+	}
+
+	// Exclui o documento (libera o hash SHA-256) e limpa quaisquer órfãos restantes (inclusive termos de restituição sem bens)
 	await db.prepare('DELETE FROM documentos WHERE id = ?').bind(docId).run();
-
-	// Limpa procedimentos que ficaram órfãos (sem bens e sem documentos)
-	await db
-		.prepare(
-			`DELETE FROM procedimentos
-			 WHERE id = ?
-			   AND NOT EXISTS (SELECT 1 FROM bens WHERE procedimento_id = ?)
-			   AND NOT EXISTS (SELECT 1 FROM documentos WHERE procedimento_id = ?)`
-		)
-		.bind(doc.procedimento_id, doc.procedimento_id, doc.procedimento_id)
-		.run();
+	await limparResquiciosOrfaos(db);
 
 	return json({ ok: true });
 };

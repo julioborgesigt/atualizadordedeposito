@@ -80,3 +80,37 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 
 	inicializado = true;
 }
+
+/**
+ * Remove registros órfãos de movimentações, documentos (APREENSAO e RESTITUICAO)
+ * e procedimentos que ficaram sem bens após exclusões.
+ */
+export async function limparResquiciosOrfaos(db: D1Database): Promise<void> {
+	await db.batch([
+		// 1. Remove movimentações cujo bem já foi excluído
+		db.prepare(`
+			DELETE FROM movimentacoes
+			WHERE bem_id NOT IN (SELECT id FROM bens)
+		`),
+		// 2. Remove documentos (APREENSAO ou RESTITUICAO) que não têm mais movimentação ligada a um bem vivo
+		//    ou cujo procedimento não possui mais nenhum bem cadastrado
+		db.prepare(`
+			DELETE FROM documentos
+			WHERE id NOT IN (
+				SELECT DISTINCT m.documento_id
+				FROM movimentacoes m
+				JOIN bens b ON b.id = m.bem_id
+				WHERE m.documento_id IS NOT NULL
+			)
+			OR procedimento_id NOT IN (
+				SELECT DISTINCT procedimento_id FROM bens
+			)
+		`),
+		// 3. Remove procedimentos órfãos (sem bens e sem documentos)
+		db.prepare(`
+			DELETE FROM procedimentos
+			WHERE id NOT IN (SELECT DISTINCT procedimento_id FROM bens)
+			  AND id NOT IN (SELECT DISTINCT procedimento_id FROM documentos)
+		`)
+	]);
+}

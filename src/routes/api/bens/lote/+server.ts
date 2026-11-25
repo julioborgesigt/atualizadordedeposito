@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { ensureSchema } from '$lib/server/db';
+import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 const STATUS_VALIDOS = new Set([
 	'EM_DEPOSITO',
@@ -115,20 +115,16 @@ export const DELETE: RequestHandler = async ({ request, platform }) => {
 	const placeholders = ids.map(() => '?').join(',');
 
 	await db
+		.prepare(`DELETE FROM movimentacoes WHERE bem_id IN (${placeholders})`)
+		.bind(...ids)
+		.run();
+
+	await db
 		.prepare(`DELETE FROM bens WHERE id IN (${placeholders})`)
 		.bind(...ids)
 		.run();
 
-	// Remove documentos de apreensão que ficaram sem nenhum bem vinculado, liberando reimportação do PDF
-	await db
-		.prepare(
-			`DELETE FROM documentos
-			 WHERE tipo = 'APREENSAO'
-			   AND id NOT IN (
-			     SELECT DISTINCT documento_id FROM movimentacoes WHERE documento_id IS NOT NULL
-			   )`
-		)
-		.run();
+	await limparResquiciosOrfaos(db);
 
 	return json({ ok: true, excluidos: ids.length });
 };

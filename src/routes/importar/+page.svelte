@@ -277,7 +277,16 @@
 					{/if}
 				</div>
 				{#if doc.jaImportado}
-					<span class="badge warn">JÁ IMPORTADO (ignorado)</span>
+					<div style="display:flex; align-items:center; gap:0.5rem;">
+						<span class="badge warn">JÁ IMPORTADO (ignorado)</span>
+						<button
+							type="button"
+							style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem; font-weight:600; cursor:pointer;"
+							onclick={() => (doc.jaImportado = false)}
+						>
+							Reimportar mesmo assim
+						</button>
+					</div>
 				{/if}
 			</header>
 
