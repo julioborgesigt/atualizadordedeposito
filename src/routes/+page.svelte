@@ -59,6 +59,21 @@
 		data.bens.length > 0 && data.bens.every((b) => selecionados.includes(b.id))
 	);
 
+	const caixaVisualizadaLabel = $derived.by(() => {
+		if (!data.filtros.caixa) return 'Todas as caixas';
+		if (data.filtros.caixa === '__SEM_CAIXA__') return 'Itens sem caixa';
+		const encontrada = data.caixas.find((c) => String(c.id) === data.filtros.caixa);
+		return encontrada ? `Caixa "${encontrada.nome}"` : 'Caixa selecionada';
+	});
+
+	const procedimentoVisualizadoLabel = $derived.by(() => {
+		if (!data.filtros.procedimento) return 'Todos os procedimentos';
+		const encontrado = data.procedimentos.find((p) => String(p.id) === data.filtros.procedimento);
+		return encontrado
+			? `${encontrado.tipo} ${encontrado.numero_normalizado}`
+			: 'Procedimento selecionado';
+	});
+
 	function alternarTodos(marcar: boolean) {
 		if (marcar) {
 			selecionados = data.bens.map((b) => b.id);
@@ -593,6 +608,16 @@
 	</div>
 {/if}
 
+<div class="visao-atual-banner">
+	<div class="visao-titulo">
+		<span class="visao-tag">Visualizando agora</span>
+		<h2>{caixaVisualizadaLabel} • {procedimentoVisualizadoLabel}</h2>
+	</div>
+	<div class="visao-meta">
+		<span><strong>{data.bens.length}</strong> item(ns) exibido(s)</span>
+	</div>
+</div>
+
 <div class="table-wrap">
 	<table>
 		<thead>
@@ -959,6 +984,44 @@
 	.btn-bulk:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+	.visao-atual-banner {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+		background: #eff6ff;
+		border: 1px solid #bfdbfe;
+		border-left: 4px solid #2563eb;
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		margin-bottom: 0.75rem;
+	}
+	.visao-titulo {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		flex-wrap: wrap;
+	}
+	.visao-tag {
+		background: #2563eb;
+		color: #fff;
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.22rem 0.55rem;
+		border-radius: 999px;
+	}
+	.visao-titulo h2 {
+		margin: 0;
+		font-size: 1.05rem;
+		color: #1e3a8a;
+	}
+	.visao-meta {
+		font-size: 0.85rem;
+		color: #1e40af;
 	}
 	.table-wrap {
 		background: #fff;
