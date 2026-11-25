@@ -39,15 +39,24 @@ export interface ApreensaoDashboard {
 	caixas_nomes: string | null;
 }
 
+export interface ProcedimentoDashboard {
+	id: number;
+	tipo: string;
+	numero_normalizado: string;
+	operacao: string | null;
+	total_bens: number;
+}
+
 export const load: PageServerLoad = async ({ url, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) {
 		return {
 			bens: [] as BemLista[],
 			caixas: [] as CaixaDashboard[],
+			procedimentos: [] as ProcedimentoDashboard[],
 			apreensoes: [] as ApreensaoDashboard[],
 			contadores: { total: 0, emDeposito: 0, restituidos: 0, semCaixa: 0 },
-			filtros: { q: '', status: '', caixa: '' }
+			filtros: { q: '', status: '', caixa: '', procedimento: '' }
 		};
 	}
 
@@ -57,6 +66,7 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 	const q = url.searchParams.get('q')?.trim() ?? '';
 	const status = url.searchParams.get('status')?.trim() ?? '';
 	const caixa = url.searchParams.get('caixa')?.trim() ?? '';
+	const procedimento = url.searchParams.get('procedimento')?.trim() ?? '';
 
 	const where: string[] = [];
 	const binds: unknown[] = [];
@@ -79,6 +89,11 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 	} else if (caixa) {
 		where.push('b.caixa_id = ?');
 		binds.push(Number(caixa));
+	}
+
+	if (procedimento) {
+		where.push('b.procedimento_id = ?');
+		binds.push(Number(procedimento));
 	}
 
 	const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -125,6 +140,17 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		em_deposito: c.em_deposito ?? 0
 	}));
 
+	const { results: procedimentos } = await db
+		.prepare(
+			`SELECT p.id, p.tipo, p.numero_normalizado, p.operacao,
+			        COUNT(b.id) AS total_bens
+			 FROM procedimentos p
+			 JOIN bens b ON b.procedimento_id = p.id
+			 GROUP BY p.id
+			 ORDER BY p.numero_normalizado ASC`
+		)
+		.all<ProcedimentoDashboard>();
+
 	const { results: apreensoes } = await db
 		.prepare(
 			`SELECT d.id, d.tipo AS doc_tipo, d.nome_arquivo, d.data_ato, d.parte_nome,
@@ -161,6 +187,7 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 	return {
 		bens,
 		caixas,
+		procedimentos,
 		apreensoes,
 		contadores: {
 			total: stats?.total ?? 0,
@@ -168,6 +195,6 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			restituidos: stats?.restituidos ?? 0,
 			semCaixa: stats?.semCaixa ?? 0
 		},
-		filtros: { q, status, caixa }
+		filtros: { q, status, caixa, procedimento }
 	};
 };

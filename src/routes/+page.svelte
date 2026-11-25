@@ -37,6 +37,14 @@
 		}))
 	]);
 
+	const opcoesFiltroProcedimento = $derived([
+		{ value: '', label: 'Todos os procedimentos' },
+		...data.procedimentos.map((proc) => ({
+			value: String(proc.id),
+			label: `${proc.tipo} ${proc.numero_normalizado} (${proc.total_bens})`
+		}))
+	]);
+
 	const opcoesMoverLoteCaixa = $derived([
 		{ value: '', label: 'Mover selecionados para caixa...' },
 		{ value: '__NOVA__', label: '+ Criar nova caixa e mover...' },
@@ -67,14 +75,28 @@
 		}
 	}
 
-	function filtrarPorCaixa(valorCaixa: string) {
+	function aplicarFiltros(novos: { caixa?: string; procedimento?: string }) {
 		const params = new URLSearchParams();
+		const caixaVal = novos.caixa !== undefined ? novos.caixa : data.filtros.caixa;
+		const procVal =
+			novos.procedimento !== undefined ? novos.procedimento : data.filtros.procedimento;
+
 		if (data.filtros.q) params.set('q', data.filtros.q);
 		if (data.filtros.status) params.set('status', data.filtros.status);
-		if (valorCaixa) params.set('caixa', valorCaixa);
+		if (caixaVal) params.set('caixa', caixaVal);
+		if (procVal) params.set('procedimento', procVal);
+
 		selecionados = [];
 		const qs = params.toString();
 		goto(qs ? `/?${qs}` : '/');
+	}
+
+	function filtrarPorCaixa(valorCaixa: string) {
+		aplicarFiltros({ caixa: valorCaixa });
+	}
+
+	function filtrarPorProcedimento(valorProc: string) {
+		aplicarFiltros({ procedimento: valorProc });
 	}
 
 	async function atualizarBem(id: number, patch: Record<string, unknown>) {
@@ -486,6 +508,14 @@
 		{/each}
 	</select>
 	<CaixaSelect
+		name="procedimento"
+		opcoes={opcoesFiltroProcedimento}
+		value={data.filtros.procedimento}
+		placeholder="Todos os procedimentos"
+		buscaPlaceholder="Pesquisar BO / IP / TCO..."
+		onchange={(val) => filtrarPorProcedimento(val)}
+	/>
+	<CaixaSelect
 		name="caixa"
 		opcoes={opcoesFiltroCaixa}
 		value={data.filtros.caixa}
@@ -494,7 +524,7 @@
 		onchange={(val) => filtrarPorCaixa(val)}
 	/>
 	<button type="submit">Filtrar</button>
-	{#if data.filtros.q || data.filtros.status || data.filtros.caixa}
+	{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento}
 		<a href="/" class="btn-clear">Limpar filtros</a>
 	{/if}
 </form>
