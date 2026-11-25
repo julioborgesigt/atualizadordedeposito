@@ -68,6 +68,25 @@
 			: 'Procedimento selecionado';
 	});
 
+	const intervaloExibido = $derived.by(() => {
+		const { paginaAtual, porPagina, totalItens } = data.paginacao;
+		if (totalItens === 0 || data.bens.length === 0) return null;
+		const inicio = (paginaAtual - 1) * porPagina + 1;
+		const fim = inicio + data.bens.length - 1;
+		return { inicio, fim, totalItens };
+	});
+
+	const paginasVisiveis = $derived.by(() => {
+		const { paginaAtual, totalPaginas } = data.paginacao;
+		const lista: number[] = [];
+		const inicio = Math.max(1, paginaAtual - 2);
+		const fim = Math.min(totalPaginas, paginaAtual + 2);
+		for (let p = inicio; p <= fim; p++) {
+			lista.push(p);
+		}
+		return lista;
+	});
+
 	function alternarTodos(marcar: boolean) {
 		if (marcar) {
 			selecionados = data.bens.map((b) => b.id);
@@ -84,16 +103,18 @@
 		}
 	}
 
-	function aplicarFiltros(novos: { caixa?: string; procedimento?: string }) {
+	function aplicarFiltros(novos: { caixa?: string; procedimento?: string; pagina?: number }) {
 		const params = new URLSearchParams();
 		const caixaVal = novos.caixa !== undefined ? novos.caixa : data.filtros.caixa;
 		const procVal =
 			novos.procedimento !== undefined ? novos.procedimento : data.filtros.procedimento;
+		const paginaVal = novos.pagina ?? 1;
 
 		if (data.filtros.q) params.set('q', data.filtros.q);
 		if (data.filtros.status) params.set('status', data.filtros.status);
 		if (caixaVal) params.set('caixa', caixaVal);
 		if (procVal) params.set('procedimento', procVal);
+		if (paginaVal > 1) params.set('pagina', String(paginaVal));
 
 		selecionados = [];
 		const qs = params.toString();
@@ -101,11 +122,16 @@
 	}
 
 	function filtrarPorCaixa(valorCaixa: string) {
-		aplicarFiltros({ caixa: valorCaixa });
+		aplicarFiltros({ caixa: valorCaixa, pagina: 1 });
 	}
 
 	function filtrarPorProcedimento(valorProc: string) {
-		aplicarFiltros({ procedimento: valorProc });
+		aplicarFiltros({ procedimento: valorProc, pagina: 1 });
+	}
+
+	function irParaPagina(pagina: number) {
+		if (pagina < 1 || pagina > data.paginacao.totalPaginas) return;
+		aplicarFiltros({ pagina });
 	}
 
 	async function atualizarBem(id: number, patch: Record<string, unknown>) {
@@ -359,7 +385,14 @@
 		<h2>{caixaVisualizadaLabel} • {procedimentoVisualizadoLabel}</h2>
 	</div>
 	<div class="visao-meta">
-		<span><strong>{data.bens.length}</strong> item(ns) exibido(s)</span>
+		{#if intervaloExibido}
+			<span>
+				Exibindo <strong>{intervaloExibido.inicio}–{intervaloExibido.fim}</strong> de
+				<strong>{intervaloExibido.totalItens}</strong> item(ns)
+			</span>
+		{:else}
+			<span><strong>0</strong> item(ns) exibido(s)</span>
+		{/if}
 	</div>
 </div>
 
@@ -372,7 +405,7 @@
 						type="checkbox"
 						checked={todosSelecionados}
 						onchange={(e) => alternarTodos(e.currentTarget.checked)}
-						title="Selecionar todos desta lista"
+						title="Selecionar todos desta página"
 					/>
 				</th>
 				<th>Procedimento</th>
@@ -451,6 +484,66 @@
 		</tbody>
 	</table>
 </div>
+
+{#if data.paginacao.totalPaginas > 1}
+	<nav class="paginacao" aria-label="Paginação de itens">
+		<span class="paginacao-info">
+			Página <strong>{data.paginacao.paginaAtual}</strong> de
+			<strong>{data.paginacao.totalPaginas}</strong> ({data.paginacao.totalItens} itens no total)
+		</span>
+
+		<div class="paginacao-botoes">
+			<button
+				type="button"
+				class="page-btn"
+				disabled={data.paginacao.paginaAtual <= 1}
+				onclick={() => irParaPagina(data.paginacao.paginaAtual - 1)}
+			>
+				← Anterior
+			</button>
+
+			{#if paginasVisiveis[0] > 1}
+				<button type="button" class="page-btn" onclick={() => irParaPagina(1)}>1</button>
+				{#if paginasVisiveis[0] > 2}
+					<span class="page-dots">…</span>
+				{/if}
+			{/if}
+
+			{#each paginasVisiveis as p}
+				<button
+					type="button"
+					class="page-btn"
+					class:active={p === data.paginacao.paginaAtual}
+					onclick={() => irParaPagina(p)}
+				>
+					{p}
+				</button>
+			{/each}
+
+			{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas}
+				{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas - 1}
+					<span class="page-dots">…</span>
+				{/if}
+				<button
+					type="button"
+					class="page-btn"
+					onclick={() => irParaPagina(data.paginacao.totalPaginas)}
+				>
+					{data.paginacao.totalPaginas}
+				</button>
+			{/if}
+
+			<button
+				type="button"
+				class="page-btn"
+				disabled={data.paginacao.paginaAtual >= data.paginacao.totalPaginas}
+				onclick={() => irParaPagina(data.paginacao.paginaAtual + 1)}
+			>
+				Próxima →
+			</button>
+		</div>
+	</nav>
+{/if}
 
 <style>
 	.kpis {
@@ -716,5 +809,55 @@
 	}
 	.btn-row-del:hover {
 		background: #fecaca;
+	}
+	.paginacao {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		margin-top: 0.85rem;
+	}
+	.paginacao-info {
+		font-size: 0.86rem;
+		color: #475569;
+	}
+	.paginacao-botoes {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.page-btn {
+		padding: 0.42rem 0.75rem;
+		border: 1px solid #cbd5e1;
+		border-radius: 6px;
+		background: #fff;
+		color: #1e293b;
+		font-size: 0.84rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.page-btn:hover:not(:disabled) {
+		background: #eff6ff;
+		border-color: #93c5fd;
+		color: #1d4ed8;
+	}
+	.page-btn.active {
+		background: #2563eb;
+		border-color: #2563eb;
+		color: #fff;
+	}
+	.page-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.page-dots {
+		color: #64748b;
+		padding: 0 0.25rem;
 	}
 </style>
