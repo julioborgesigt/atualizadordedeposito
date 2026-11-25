@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
+	import { exportarParaPdf, exportarParaXlsx, traduzirStatus } from '$lib/export/exportarBens';
+	import type { BemLista } from './+page.server';
 
 	let { data } = $props();
 
@@ -15,6 +17,7 @@
 
 	let selecionados = $state<number[]>([]);
 	let processandoLote = $state(false);
+	let exportando = $state<'XLSX' | 'PDF' | null>(null);
 	let feedback = $state<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
 
 	// Estados da barra de ação em lote
@@ -252,6 +255,50 @@
 			processandoLote = false;
 		}
 	}
+
+	async function exportarRelatorio(formato: 'XLSX' | 'PDF') {
+		if (exportando) return;
+		exportando = formato;
+		feedback = null;
+
+		try {
+			const params = new URLSearchParams();
+			if (data.filtros.q) params.set('q', data.filtros.q);
+			if (data.filtros.status) params.set('status', data.filtros.status);
+			if (data.filtros.caixa) params.set('caixa', data.filtros.caixa);
+			if (data.filtros.procedimento) params.set('procedimento', data.filtros.procedimento);
+
+			const qs = params.toString();
+			const res = await fetch(qs ? `/api/bens/exportar?${qs}` : '/api/bens/exportar');
+			if (!res.ok) throw new Error('Falha ao buscar registros para exportação.');
+
+			const { bens } = (await res.json()) as { bens: BemLista[] };
+			if (!bens || bens.length === 0) {
+				feedback = { tipo: 'erro', texto: 'Não há itens no filtro atual para exportar.' };
+				return;
+			}
+
+			const contexto = {
+				caixaLabel: caixaVisualizadaLabel,
+				procedimentoLabel: procedimentoVisualizadoLabel,
+				statusLabel: data.filtros.status ? traduzirStatus(data.filtros.status) : '',
+				termoBusca: data.filtros.q
+			};
+
+			if (formato === 'XLSX') {
+				await exportarParaXlsx(bens, contexto);
+			} else {
+				await exportarParaPdf(bens, contexto);
+			}
+		} catch (e: unknown) {
+			feedback = {
+				tipo: 'erro',
+				texto: e instanceof Error ? e.message : 'Erro ao gerar arquivo de exportação.'
+			};
+		} finally {
+			exportando = null;
+		}
+	}
 </script>
 
 <div class="kpis">
@@ -393,6 +440,27 @@
 		{:else}
 			<span><strong>0</strong> item(ns) exibido(s)</span>
 		{/if}
+
+		<div class="export-btns">
+			<button
+				type="button"
+				class="btn-export xlsx"
+				disabled={data.paginacao.totalItens === 0 || exportando !== null}
+				onclick={() => exportarRelatorio('XLSX')}
+				title="Exportar todos os itens deste filtro em Excel (.xlsx)"
+			>
+				{exportando === 'XLSX' ? 'Gerando XLSX...' : '⬇ Exportar XLSX'}
+			</button>
+			<button
+				type="button"
+				class="btn-export pdf"
+				disabled={data.paginacao.totalItens === 0 || exportando !== null}
+				onclick={() => exportarRelatorio('PDF')}
+				title="Exportar todos os itens deste filtro em PDF (.pdf)"
+			>
+				{exportando === 'PDF' ? 'Gerando PDF...' : '⬇ Exportar PDF'}
+			</button>
+		</div>
 	</div>
 </div>
 
@@ -732,8 +800,47 @@
 		color: #1e3a8a;
 	}
 	.visao-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+		flex-wrap: wrap;
 		font-size: 0.85rem;
 		color: #1e40af;
+	}
+	.export-btns {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+	}
+	.btn-export {
+		padding: 0.38rem 0.72rem;
+		border-radius: 6px;
+		font-size: 0.79rem;
+		font-weight: 700;
+		cursor: pointer;
+		border: 1px solid transparent;
+		transition: background 0.12s, border-color 0.12s;
+		white-space: nowrap;
+	}
+	.btn-export.xlsx {
+		background: #dcfce7;
+		color: #166534;
+		border-color: #86efac;
+	}
+	.btn-export.xlsx:hover:not(:disabled) {
+		background: #bbf7d0;
+	}
+	.btn-export.pdf {
+		background: #fee2e2;
+		color: #991b1b;
+		border-color: #fca5a5;
+	}
+	.btn-export.pdf:hover:not(:disabled) {
+		background: #fecaca;
+	}
+	.btn-export:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	.table-wrap {
 		background: #fff;
