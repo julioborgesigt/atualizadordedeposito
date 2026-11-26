@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import { afterNavigate } from '$app/navigation';
+	import IndicadorTarefa from '$lib/components/IndicadorTarefa.svelte';
 
 	let { children } = $props();
 
@@ -91,6 +92,8 @@
 	<main class="content">
 		{@render children()}
 	</main>
+
+	<IndicadorTarefa />
 </div>
 
 <style>

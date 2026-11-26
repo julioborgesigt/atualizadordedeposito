@@ -2,6 +2,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
 	import { exportarParaPdf, exportarParaXlsx, traduzirStatus } from '$lib/export/exportarBens';
+	import { tarefaStore } from '$lib/stores/tarefa.svelte';
 	import type { BemLista } from './+page.server';
 
 	let { data } = $props();
@@ -347,6 +348,8 @@
 		if (exportando) return;
 		exportando = formato;
 		feedback = null;
+		const nomeFormato = formato === 'XLSX' ? 'planilha Excel' : 'relatório PDF';
+		tarefaStore.iniciar(`Gerando ${nomeFormato}...`, 'Buscando itens do filtro atual.');
 
 		try {
 			const params = new URLSearchParams();
@@ -362,6 +365,7 @@
 			const { bens } = (await res.json()) as { bens: BemLista[] };
 			if (!bens || bens.length === 0) {
 				feedback = { tipo: 'erro', texto: 'Não há itens no filtro atual para exportar.' };
+				tarefaStore.falhar('Nada para exportar', 'Não há itens no filtro atual para exportar.');
 				return;
 			}
 
@@ -377,11 +381,16 @@
 			} else {
 				await exportarParaPdf(bens, contexto);
 			}
+
+			tarefaStore.concluir(
+				`Exportação concluída!`,
+				`${bens.length} item(ns) exportado(s) em ${formato}.`,
+				{ autoFecharMs: 5000 }
+			);
 		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao gerar arquivo de exportação.'
-			};
+			const msg = e instanceof Error ? e.message : 'Erro ao gerar arquivo de exportação.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro na exportação', msg);
 		} finally {
 			exportando = null;
 		}
@@ -391,6 +400,10 @@
 		if (exportando || selecionados.length === 0) return;
 		exportando = 'PDF_SELECIONADOS';
 		feedback = null;
+		tarefaStore.iniciar(
+			'Gerando PDF dos selecionados...',
+			`Preparando ${selecionados.length} item(ns) selecionado(s).`
+		);
 
 		try {
 			// Filtra os itens selecionados presentes na página carregada
@@ -412,7 +425,9 @@
 			}
 
 			if (itensParaExportar.length === 0) {
-				feedback = { tipo: 'erro', texto: 'Nenhum dos itens selecionados foi encontrado para gerar o PDF.' };
+				const msg = 'Nenhum dos itens selecionados foi encontrado para gerar o PDF.';
+				feedback = { tipo: 'erro', texto: msg };
+				tarefaStore.falhar('Nada para exportar', msg);
 				return;
 			}
 
@@ -425,11 +440,15 @@
 			};
 
 			await exportarParaPdf(itensParaExportar, contexto);
+			tarefaStore.concluir(
+				'PDF gerado com sucesso!',
+				`${itensParaExportar.length} item(ns) selecionado(s) exportado(s).`,
+				{ autoFecharMs: 5000 }
+			);
 		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao gerar PDF dos itens selecionados.'
-			};
+			const msg = e instanceof Error ? e.message : 'Erro ao gerar PDF dos itens selecionados.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro ao gerar PDF', msg);
 		} finally {
 			exportando = null;
 		}

@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import { extrairTextoPdf } from '$lib/pdf/extractText';
 	import { parseRelatorioPdf } from '$lib/pdf/parser';
 	import type { DocumentoParseado, PreviewDocumento } from '$lib/types';
 	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
+	import { tarefaStore } from '$lib/stores/tarefa.svelte';
 
 	let { data } = $props();
 
@@ -18,13 +19,17 @@
 	let novaCaixaNome = $state('');
 	let operacao = $state('');
 	let previewDocs = $state<PreviewDocumento[]>([]);
+	let inicializouCaixas = false;
 
 	$effect(() => {
-		if (caixasExistentes.length === 0 && data.caixas.length > 0) {
+		if (data.caixas.length > 0) {
 			caixasExistentes = data.caixas;
-			modoCaixa = 'EXISTENTE';
-			if (!caixaExistenteNome) {
-				caixaExistenteNome = data.caixas[0].nome;
+			if (!inicializouCaixas) {
+				inicializouCaixas = true;
+				modoCaixa = 'EXISTENTE';
+				if (!caixaExistenteNome) {
+					caixaExistenteNome = data.caixas[0].nome;
+				}
 			}
 		}
 	});
@@ -50,10 +55,13 @@
 			(modoCaixa === 'NOVA' && novaCaixaNome.trim().length > 0)
 	);
 
-	async function processarArquivos(files: FileList | null) {
-		if (!files || files.length === 0) return;
+	async function processarArquivos(input: HTMLInputElement) {
+		const lista = input.files ? Array.from(input.files) : [];
+		input.value = '';
+		if (lista.length === 0) return;
 		if (!passoCaixaValido) {
 			erro = 'Antes de importar o PDF, selecione uma caixa existente ou informe o nome da nova caixa.';
+			tarefaStore.falhar('Caixa de destino não definida', erro);
 			return;
 		}
 		erro = null;
@@ -61,13 +69,31 @@
 		carregando = true;
 		previewDocs = [];
 
+		tarefaStore.iniciar(
+			`Lendo PDFs (0 de ${lista.length})...`,
+			'Extraindo texto e identificando procedimentos e itens.',
+			5
+		);
+
 		try {
 			const parseados: DocumentoParseado[] = [];
-			for (const file of Array.from(files)) {
+			for (let i = 0; i < lista.length; i++) {
+				const file = lista[i];
+				tarefaStore.atualizar(
+					`Lendo PDF ${i + 1} de ${lista.length}...`,
+					file.name,
+					Math.round(((i + 0.5) / lista.length) * 75)
+				);
 				const { texto, hashSha256 } = await extrairTextoPdf(file);
 				const doc = parseRelatorioPdf(texto, file.name, hashSha256);
 				parseados.push(doc);
 			}
+
+			tarefaStore.atualizar(
+				'Conciliando itens com o depósito...',
+				'Verificando duplicidades e correspondências.',
+				85
+			);
 
 			const res = await fetch('/api/preview', {
 				method: 'POST',
@@ -88,8 +114,14 @@
 				caixasExistentes = resData.caixas;
 			}
 			previewDocs = resData.documentos;
+			tarefaStore.concluir(
+				'Pré-visualização concluída',
+				`${resData.documentos.length} documento(s) pronto(s) para revisão e confirmação.`,
+				{ autoFecharMs: 5000 }
+			);
 		} catch (e: unknown) {
 			erro = e instanceof Error ? e.message : 'Erro ao ler os PDFs.';
+			tarefaStore.falhar('Erro ao ler PDFs', erro);
 		} finally {
 			carregando = false;
 		}
@@ -98,10 +130,21 @@
 	async function confirmarImportacao() {
 		if (!passoCaixaValido) {
 			erro = 'Defina a caixa de destino antes de confirmar a importação.';
+			tarefaStore.falhar('Caixa de destino não definida', erro);
 			return;
 		}
 		salvando = true;
 		erro = null;
+		mensagemSucesso = null;
+
+		const totalDocs = previewDocs.filter((d) => !d.jaImportado).length;
+		tarefaStore.iniciar(
+			'Salvando importação no banco...',
+			caixaFinal
+				? `Gravando ${totalDocs} documento(s) na caixa "${caixaFinal}".`
+				: `Gravando ${totalDocs} documento(s) sem vínculo de caixa.`
+		);
+
 		try {
 			const res = await fetch('/api/commit', {
 				method: 'POST',
@@ -122,11 +165,26 @@
 				resumo: { docsSalvos: number; totalApreendidos: number; totalRestituidos: number };
 			};
 			const msgCaixa = caixaFinal ? ` na caixa "${caixaFinal}"` : '';
+			const resumoTexto = `${resumo.docsSalvos} documento(s), ${resumo.totalApreendidos} bem(ns) cadastrado(s) e ${resumo.totalRestituidos} restituição(ões) aplicada(s)${msgCaixa}.`;
+
 			mensagemSucesso = `Salvo${msgCaixa}! ${resumo.docsSalvos} documento(s), ${resumo.totalApreendidos} bem(ns) cadastrado(s) e ${resumo.totalRestituidos} restituição(ões) aplicada(s).`;
 			previewDocs = [];
-			setTimeout(() => goto('/'), 1400);
+
+			// Atualiza a lista de caixas em segundo plano sem sair da página
+			const nomeCaixaSalva = caixaFinal;
+			await invalidateAll();
+			if (modoCaixa === 'NOVA' && nomeCaixaSalva) {
+				caixaExistenteNome = nomeCaixaSalva;
+				novaCaixaNome = '';
+				modoCaixa = 'EXISTENTE';
+			}
+
+			tarefaStore.concluir('Importação concluída com sucesso!', resumoTexto, {
+				acao: { label: 'Ver bens no depósito →', href: '/' }
+			});
 		} catch (e: unknown) {
 			erro = e instanceof Error ? e.message : 'Erro ao salvar.';
+			tarefaStore.falhar('Erro ao salvar importação', erro);
 		} finally {
 			salvando = false;
 		}
@@ -255,7 +313,7 @@
 			accept="application/pdf"
 			multiple
 			disabled={!passoCaixaValido || carregando}
-			onchange={(e) => processarArquivos((e.currentTarget as HTMLInputElement).files)}
+			onchange={(e) => processarArquivos(e.currentTarget as HTMLInputElement)}
 		/>
 		<span class="drop-icon" aria-hidden="true">
 			{#if carregando}
@@ -407,9 +465,13 @@
 			disabled={!temAlgoParaSalvar || !passoCaixaValido || salvando}
 			onclick={confirmarImportacao}
 		>
-			<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+			{#if salvando}
+				<span class="btn-spinner" aria-hidden="true"></span>
+			{:else}
+				<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+			{/if}
 			{salvando
-				? 'Gravando no Cloudflare D1...'
+				? 'Salvando no banco de dados...'
 				: caixaFinal
 					? `Confirmar e salvar na caixa "${caixaFinal}"`
 					: 'Confirmar e salvar no banco'}
@@ -583,6 +645,15 @@
 		border-top-color: var(--primary);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
+	}
+	.btn-spinner {
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
+		border: 2px solid hsl(0 0% 100% / 0.35);
+		border-top-color: #fff;
+		border-radius: 50%;
+		animation: spin 0.75s linear infinite;
 	}
 	@keyframes spin {
 		to {
