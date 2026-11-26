@@ -301,40 +301,86 @@
 	}
 </script>
 
-<div class="kpis">
-	<div class="kpi">
-		<span>Total de Bens</span>
-		<strong>{data.contadores.total}</strong>
+<svelte:head>
+	<title>Depósito de Bens — Custódia PCCE</title>
+</svelte:head>
+
+<div class="page-head">
+	<div>
+		<h1>Depósito de Bens</h1>
+		<p class="sub">Consulte, filtre e atualize os bens apreendidos sob custódia.</p>
 	</div>
-	<div class="kpi amber">
-		<span>Em Depósito</span>
-		<strong>{data.contadores.emDeposito}</strong>
-	</div>
-	<div class="kpi green">
-		<span>Restituídos</span>
-		<strong>{data.contadores.restituidos}</strong>
-	</div>
-	<div class="kpi purple">
-		<span>Caixas Físicas</span>
-		<strong>{data.caixas.length}</strong>
-	</div>
+	<a href="/importar" class="btn btn-primary head-cta">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+		Importar PDFs
+	</a>
 </div>
 
+<section class="kpis" aria-label="Indicadores">
+	<div class="kpi">
+		<span class="kpi-icon blue" aria-hidden="true">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /></svg>
+		</span>
+		<div>
+			<span class="kpi-label">Total de bens</span>
+			<strong class="kpi-value">{data.contadores.total}</strong>
+		</div>
+	</div>
+	<div class="kpi">
+		<span class="kpi-icon amber" aria-hidden="true">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+		</span>
+		<div>
+			<span class="kpi-label">Em depósito</span>
+			<strong class="kpi-value">{data.contadores.emDeposito}</strong>
+		</div>
+	</div>
+	<div class="kpi">
+		<span class="kpi-icon green" aria-hidden="true">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+		</span>
+		<div>
+			<span class="kpi-label">Restituídos</span>
+			<strong class="kpi-value">{data.contadores.restituidos}</strong>
+		</div>
+	</div>
+	<div class="kpi">
+		<span class="kpi-icon violet" aria-hidden="true">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>
+		</span>
+		<div>
+			<span class="kpi-label">Caixas físicas</span>
+			<strong class="kpi-value">{data.caixas.length}</strong>
+		</div>
+	</div>
+</section>
+
 {#if feedback}
-	<div class="alert {feedback.tipo === 'ok' ? 'success' : 'error'}">
+	<div class="alert {feedback.tipo === 'ok' ? 'success' : 'error'}" role="status">
 		<span>{feedback.texto}</span>
-		<button type="button" class="close-btn" onclick={() => (feedback = null)}>×</button>
+		<button type="button" class="close-btn" aria-label="Fechar aviso" onclick={() => (feedback = null)}>×</button>
 	</div>
 {/if}
 
-<form method="GET" class="filtros">
-	<input
-		type="search"
-		name="q"
-		value={data.filtros.q}
-		placeholder="Buscar por BO/IP, IMEI, placa, cartão, descrição, caixa ou operação..."
-	/>
-	<select name="status" value={data.filtros.status} onchange={(e) => e.currentTarget.form?.requestSubmit()}>
+<form method="GET" class="filtros panel" role="search">
+	<div class="f-busca">
+		<svg class="f-busca-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+		<input
+			id="filtro-busca"
+			type="search"
+			name="q"
+			value={data.filtros.q}
+			placeholder="Buscar por BO/IP, IMEI, placa, cartão, descrição, caixa ou operação..."
+			aria-label="Buscar bens"
+		/>
+	</div>
+	<select
+		id="filtro-status"
+		name="status"
+		value={data.filtros.status}
+		aria-label="Filtrar por status"
+		onchange={(e) => e.currentTarget.form?.requestSubmit()}
+	>
 		<option value="">Todos os status</option>
 		{#each STATUS_OPCOES as st}
 			<option value={st.value}>{st.label}</option>
@@ -356,16 +402,19 @@
 		buscaPlaceholder="Pesquisar BO / IP / TCO..."
 		onchange={(val) => filtrarPorProcedimento(val)}
 	/>
-	<button type="submit">Filtrar</button>
-	{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento}
-		<a href="/" class="btn-clear">Limpar filtros</a>
-	{/if}
+	<div class="f-acoes">
+		<button type="submit" class="btn btn-dark">Filtrar</button>
+		{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento}
+			<a href="/" class="btn btn-ghost">Limpar</a>
+		{/if}
+	</div>
 </form>
 
 {#if selecionados.length > 0}
-	<div class="bulk-bar">
-		<div class="bulk-count">
-			<strong>{selecionados.length}</strong> item(ns) selecionado(s)
+	<div class="bulk-bar" role="region" aria-label="Ações em lote">
+		<div class="bulk-head">
+			<span class="bulk-count"><strong>{selecionados.length}</strong> selecionado(s)</span>
+			<button type="button" class="bulk-clear" onclick={() => (selecionados = [])}>Limpar seleção</button>
 		</div>
 
 		<div class="bulk-actions">
@@ -377,26 +426,22 @@
 					buscaPlaceholder="Pesquisar caixa de destino..."
 				/>
 				{#if destinoLoteCaixa === '__NOVA__'}
-					<input
-						type="text"
-						bind:value={nomeNovaCaixaLote}
-						placeholder="Nome da nova caixa..."
-					/>
+					<input type="text" bind:value={nomeNovaCaixaLote} placeholder="Nome da nova caixa..." aria-label="Nome da nova caixa" />
 				{/if}
 				<button
 					type="button"
-					class="btn-bulk primary"
+					class="btn btn-primary btn-sm"
 					disabled={processandoLote || !destinoLoteCaixa}
 					onclick={moverSelecionadosParaCaixa}
 				>
-					Mover para Caixa
+					Mover
 				</button>
 			</div>
 
-			<span class="bulk-sep">Ou</span>
+			<span class="bulk-sep">ou</span>
 
 			<div class="bulk-group">
-				<select bind:value={statusLote}>
+				<select bind:value={statusLote} aria-label="Novo status para os selecionados">
 					<option value="">Alterar status...</option>
 					{#each STATUS_OPCOES as st}
 						<option value={st.value}>{st.label}</option>
@@ -404,76 +449,93 @@
 				</select>
 				<button
 					type="button"
-					class="btn-bulk"
+					class="btn btn-sm bulk-btn"
 					disabled={processandoLote || !statusLote}
 					onclick={alterarStatusEmLote}
 				>
-					Aplicar Status
+					Aplicar
 				</button>
 			</div>
 
-			<span class="bulk-sep">Ou</span>
+			<span class="bulk-sep">ou</span>
 
 			<button
 				type="button"
-				class="btn-bulk danger"
+				class="btn btn-danger-solid btn-sm bulk-del"
 				disabled={processandoLote}
 				onclick={() => excluirItens(selecionados)}
 			>
-				Excluir Selecionados ({selecionados.length})
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+				Excluir ({selecionados.length})
 			</button>
 		</div>
 	</div>
 {/if}
 
-<div class="visao-atual-banner">
+<section class="visao panel" aria-labelledby="visao-titulo">
 	<div class="visao-titulo">
 		<span class="visao-tag">Visualizando agora</span>
-		<h2>{caixaVisualizadaLabel} • {procedimentoVisualizadoLabel}</h2>
-	</div>
-	<div class="visao-meta">
-		{#if intervaloExibido}
-			<span>
+		<h2 id="visao-titulo">
+			<span>{caixaVisualizadaLabel}</span>
+			<span class="visao-dot" aria-hidden="true">•</span>
+			<span>{procedimentoVisualizadoLabel}</span>
+		</h2>
+		<span class="visao-meta">
+			{#if intervaloExibido}
 				Exibindo <strong>{intervaloExibido.inicio}–{intervaloExibido.fim}</strong> de
 				<strong>{intervaloExibido.totalItens}</strong> item(ns)
-			</span>
-		{:else}
-			<span><strong>0</strong> item(ns) exibido(s)</span>
-		{/if}
-
-		<div class="export-btns">
-			<button
-				type="button"
-				class="btn-export xlsx"
-				disabled={data.paginacao.totalItens === 0 || exportando !== null}
-				onclick={() => exportarRelatorio('XLSX')}
-				title="Exportar todos os itens deste filtro em Excel (.xlsx)"
-			>
-				{exportando === 'XLSX' ? 'Gerando XLSX...' : '⬇ Exportar XLSX'}
-			</button>
-			<button
-				type="button"
-				class="btn-export pdf"
-				disabled={data.paginacao.totalItens === 0 || exportando !== null}
-				onclick={() => exportarRelatorio('PDF')}
-				title="Exportar todos os itens deste filtro em PDF (.pdf)"
-			>
-				{exportando === 'PDF' ? 'Gerando PDF...' : '⬇ Exportar PDF'}
-			</button>
-		</div>
+			{:else}
+				<strong>0</strong> item(ns) exibido(s)
+			{/if}
+		</span>
 	</div>
-</div>
 
-<div class="table-wrap">
-	<table>
+	<div class="export-btns">
+		<button
+			type="button"
+			class="btn btn-secondary btn-sm btn-export"
+			disabled={data.paginacao.totalItens === 0 || exportando !== null}
+			onclick={() => exportarRelatorio('XLSX')}
+			title="Exportar todos os itens deste filtro em Excel (.xlsx)"
+		>
+			<span class="file-chip xlsx" aria-hidden="true">XLS</span>
+			{exportando === 'XLSX' ? 'Gerando...' : 'Exportar XLSX'}
+		</button>
+		<button
+			type="button"
+			class="btn btn-secondary btn-sm btn-export"
+			disabled={data.paginacao.totalItens === 0 || exportando !== null}
+			onclick={() => exportarRelatorio('PDF')}
+			title="Exportar todos os itens deste filtro em PDF (.pdf)"
+		>
+			<span class="file-chip pdf" aria-hidden="true">PDF</span>
+			{exportando === 'PDF' ? 'Gerando...' : 'Exportar PDF'}
+		</button>
+	</div>
+</section>
+
+{#if data.bens.length > 0}
+	<label class="select-all-mobile">
+		<input
+			type="checkbox"
+			checked={todosSelecionados}
+			onchange={(e) => alternarTodos(e.currentTarget.checked)}
+		/>
+		Selecionar todos desta página
+	</label>
+{/if}
+
+<div class="table-wrap cards">
+	<table class="table bens-table">
 		<thead>
 			<tr>
-				<th style="width: 36px">
+				<th class="c-check">
 					<input
 						type="checkbox"
 						checked={todosSelecionados}
 						onchange={(e) => alternarTodos(e.currentTarget.checked)}
 						title="Selecionar todos desta página"
+						aria-label="Selecionar todos desta página"
 					/>
 				</th>
 				<th>Procedimento</th>
@@ -481,40 +543,46 @@
 				<th>Saldo</th>
 				<th>Caixa</th>
 				<th>Status</th>
-				<th style="width: 70px">Ações</th>
+				<th class="c-acoes"><span class="sr-only">Ações</span></th>
 			</tr>
 		</thead>
 		<tbody>
 			{#if data.bens.length === 0}
-				<tr>
+				<tr class="row-empty">
 					<td colspan="7" class="empty">
-						Nenhum bem encontrado para este filtro. <a href="/importar">Importar lote de PDFs</a>.
+						<strong>Nenhum bem encontrado para este filtro.</strong><br />
+						<a href="/importar">Importar lote de PDFs</a>
 					</td>
 				</tr>
 			{/if}
 			{#each data.bens as bem (bem.id)}
 				<tr class:row-selected={selecionados.includes(bem.id)}>
-					<td>
+					<td class="c-check">
 						<input
 							type="checkbox"
 							checked={selecionados.includes(bem.id)}
 							onchange={(e) => alternarItem(bem.id, e.currentTarget.checked)}
+							aria-label="Selecionar item"
 						/>
 					</td>
-					<td>
-						<strong>{bem.proc_tipo} {bem.proc_numero}</strong>
+					<td class="c-proc">
+						<strong class="proc">{bem.proc_tipo} {bem.proc_numero}</strong>
 						{#if bem.operacao}
 							<div class="muted">{bem.operacao}</div>
 						{/if}
 					</td>
-					<td>
+					<td class="c-desc">
 						<div class="cat">{bem.categoria}</div>
-						<div>{bem.descricao_original}</div>
+						<div class="desc">{bem.descricao_original}</div>
 					</td>
-					<td>{bem.qtd_disponivel} / {bem.qtd_total} {bem.unidade}</td>
-					<td>
+					<td class="c-saldo" data-label="Saldo">
+						<span class="saldo"><strong>{bem.qtd_disponivel}</strong> / {bem.qtd_total} {bem.unidade}</span>
+					</td>
+					<td class="c-caixa" data-label="Caixa">
 						<select
+							class="row-select"
 							value={bem.caixa_id ? String(bem.caixa_id) : ''}
+							aria-label="Caixa do item"
 							onchange={(e) =>
 								atualizarBem(bem.id, {
 									caixa_id: e.currentTarget.value ? Number(e.currentTarget.value) : null
@@ -526,10 +594,11 @@
 							{/each}
 						</select>
 					</td>
-					<td>
+					<td class="c-status" data-label="Status">
 						<select
-							class="status-select {bem.status.toLowerCase()}"
+							class="row-select status-select {bem.status.toLowerCase()}"
 							value={bem.status}
+							aria-label="Status do item"
 							onchange={(e) => atualizarBem(bem.id, { status: e.currentTarget.value })}
 						>
 							{#each STATUS_OPCOES as st}
@@ -537,14 +606,15 @@
 							{/each}
 						</select>
 					</td>
-					<td>
+					<td class="c-acoes">
 						<button
 							type="button"
-							class="btn-row-del"
+							class="btn btn-danger btn-sm btn-icon"
 							title="Excluir este item"
+							aria-label="Excluir este item"
 							onclick={() => excluirItens([bem.id])}
 						>
-							Excluir
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
 						</button>
 					</td>
 				</tr>
@@ -557,7 +627,7 @@
 	<nav class="paginacao" aria-label="Paginação de itens">
 		<span class="paginacao-info">
 			Página <strong>{data.paginacao.paginaAtual}</strong> de
-			<strong>{data.paginacao.totalPaginas}</strong> ({data.paginacao.totalItens} itens no total)
+			<strong>{data.paginacao.totalPaginas}</strong> · {data.paginacao.totalItens} itens
 		</span>
 
 		<div class="paginacao-botoes">
@@ -566,12 +636,13 @@
 				class="page-btn"
 				disabled={data.paginacao.paginaAtual <= 1}
 				onclick={() => irParaPagina(data.paginacao.paginaAtual - 1)}
+				aria-label="Página anterior"
 			>
 				← Anterior
 			</button>
 
 			{#if paginasVisiveis[0] > 1}
-				<button type="button" class="page-btn" onclick={() => irParaPagina(1)}>1</button>
+				<button type="button" class="page-btn num" onclick={() => irParaPagina(1)}>1</button>
 				{#if paginasVisiveis[0] > 2}
 					<span class="page-dots">…</span>
 				{/if}
@@ -580,8 +651,9 @@
 			{#each paginasVisiveis as p}
 				<button
 					type="button"
-					class="page-btn"
+					class="page-btn num"
 					class:active={p === data.paginacao.paginaAtual}
+					aria-current={p === data.paginacao.paginaAtual ? 'page' : undefined}
 					onclick={() => irParaPagina(p)}
 				>
 					{p}
@@ -594,7 +666,7 @@
 				{/if}
 				<button
 					type="button"
-					class="page-btn"
+					class="page-btn num"
 					onclick={() => irParaPagina(data.paginacao.totalPaginas)}
 				>
 					{data.paginacao.totalPaginas}
@@ -606,6 +678,7 @@
 				class="page-btn"
 				disabled={data.paginacao.paginaAtual >= data.paginacao.totalPaginas}
 				onclick={() => irParaPagina(data.paginacao.paginaAtual + 1)}
+				aria-label="Próxima página"
 			>
 				Próxima →
 			</button>
@@ -614,357 +687,522 @@
 {/if}
 
 <style>
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	/* KPIs */
 	.kpis {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 0.85rem;
-		margin-bottom: 1rem;
+		margin-bottom: 1.1rem;
 	}
 	.kpi {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-left: 4px solid #2563eb;
-		border-radius: 8px;
-		padding: 0.85rem 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-sm);
+		padding: 0.95rem 1.05rem;
+		min-width: 0;
 	}
-	.kpi.amber {
-		border-left-color: #d97706;
+	.kpi-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		flex-shrink: 0;
+		border-radius: 11px;
 	}
-	.kpi.green {
-		border-left-color: #16a34a;
+	.kpi-icon.blue {
+		background: var(--primary-soft);
+		color: var(--primary);
 	}
-	.kpi.purple {
-		border-left-color: #7c3aed;
+	.kpi-icon.amber {
+		background: var(--warning-soft);
+		color: hsl(32 90% 38%);
 	}
-	.kpi span {
+	.kpi-icon.green {
+		background: var(--success-soft);
+		color: var(--success);
+	}
+	.kpi-icon.violet {
+		background: var(--violet-soft);
+		color: var(--violet);
+	}
+	.kpi-label {
 		display: block;
-		font-size: 0.82rem;
-		color: #64748b;
-	}
-	.kpi strong {
-		font-size: 1.65rem;
-	}
-	.alert {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
+		font-size: 0.78rem;
 		font-weight: 500;
-		font-size: 0.9rem;
+		color: var(--text-3);
 	}
-	.alert.success {
-		background: #dcfce7;
-		color: #166534;
+	.kpi-value {
+		display: block;
+		font-size: 1.55rem;
+		font-weight: 700;
+		letter-spacing: -0.025em;
+		line-height: 1.15;
+		font-variant-numeric: tabular-nums;
 	}
-	.alert.error {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-	.close-btn {
-		background: transparent;
-		border: none;
-		font-size: 1.2rem;
-		cursor: pointer;
-		color: inherit;
-	}
+
+	/* Filtros */
 	.filtros {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(240px, 2.2fr) repeat(3, minmax(160px, 1fr)) auto;
 		gap: 0.6rem;
-		flex-wrap: wrap;
-		margin-bottom: 1rem;
 		align-items: center;
+		padding: 0.85rem;
+		margin-bottom: 1rem;
 	}
-	.filtros input {
-		flex: 1;
-		min-width: 240px;
-		padding: 0.55rem 0.75rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
+	.f-busca {
+		position: relative;
 	}
-	.filtros select,
-	.filtros button {
-		padding: 0.55rem 0.85rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		background: #fff;
+	.f-busca input {
+		width: 100%;
+		padding-left: 2.2rem;
 	}
-	.filtros button {
-		background: #0f172a;
-		color: #fff;
-		border-color: #0f172a;
-		cursor: pointer;
-		font-weight: 600;
+	.f-busca-icon {
+		position: absolute;
+		left: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--text-3);
+		pointer-events: none;
 	}
-	.btn-clear {
-		font-size: 0.84rem;
-		color: #475569;
-		text-decoration: underline;
+	.filtros > select {
+		width: 100%;
 	}
+	.f-acoes {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	/* Barra de lote */
 	.bulk-bar {
+		position: sticky;
+		top: calc(var(--header-h) + 10px);
+		z-index: 30;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.75rem 1rem;
 		flex-wrap: wrap;
-		background: #1e293b;
+		background: linear-gradient(180deg, hsl(221 39% 19%), hsl(222 42% 15%));
 		color: #fff;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 0.85rem;
+		padding: 0.7rem 0.9rem;
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-lg);
+		margin-bottom: 1rem;
+		animation: bulk-in 0.18s ease-out;
+	}
+	@keyframes bulk-in {
+		from {
+			opacity: 0;
+			transform: translateY(-6px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+	.bulk-head {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
 	}
 	.bulk-count {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
 		font-size: 0.9rem;
 	}
-	.bulk-sep {
+	.bulk-clear {
+		background: none;
+		border: none;
+		padding: 0;
+		color: hsl(220 20% 72%);
 		font-size: 0.8rem;
-		font-weight: 700;
-		color: #94a3b8;
-		padding: 0 0.15rem;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	.bulk-clear:hover {
+		color: #fff;
 	}
 	.bulk-actions {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 0.6rem;
 		flex-wrap: wrap;
 	}
 	.bulk-group {
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		flex-wrap: wrap;
 	}
 	.bulk-group select,
-	.bulk-group input {
-		padding: 0.42rem 0.6rem;
-		border-radius: 6px;
-		border: 1px solid #475569;
+	.bulk-group input,
+	.bulk-group :global(.trigger) {
+		min-height: 34px;
 		font-size: 0.83rem;
+		border-color: hsl(220 20% 34%);
 	}
-	.btn-bulk {
-		padding: 0.45rem 0.8rem;
-		border-radius: 6px;
-		border: none;
-		font-weight: 600;
-		font-size: 0.83rem;
-		cursor: pointer;
-		background: #334155;
+	.bulk-group :global(.caixa-select) {
+		min-width: 230px;
+	}
+	.bulk-btn {
+		background: hsl(0 0% 100% / 0.1);
 		color: #fff;
+		border-color: hsl(0 0% 100% / 0.16);
 	}
-	.btn-bulk.primary {
-		background: #2563eb;
+	.bulk-btn:hover:not(:disabled) {
+		background: hsl(0 0% 100% / 0.18);
 	}
-	.btn-bulk.danger {
-		background: #dc2626;
+	.bulk-sep {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: hsl(220 18% 62%);
 	}
-	.btn-bulk:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-	.visao-atual-banner {
+
+	/* Banner "Visualizando agora" */
+	.visao {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.85rem 1.25rem;
 		flex-wrap: wrap;
-		background: #eff6ff;
-		border: 1px solid #bfdbfe;
-		border-left: 4px solid #2563eb;
-		border-radius: 8px;
-		padding: 0.75rem 1rem;
-		margin-bottom: 0.75rem;
+		padding: 0.95rem 1.1rem;
+		margin-bottom: 0.85rem;
+		background: linear-gradient(180deg, var(--surface), var(--surface-2));
 	}
 	.visao-titulo {
 		display: flex;
-		align-items: center;
-		gap: 0.65rem;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: 0.2rem;
+		min-width: 0;
 	}
 	.visao-tag {
-		background: #2563eb;
-		color: #fff;
-		font-size: 0.72rem;
+		font-size: 0.68rem;
 		font-weight: 700;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		letter-spacing: 0.03em;
-		padding: 0.22rem 0.55rem;
-		border-radius: 999px;
+		color: var(--primary);
 	}
 	.visao-titulo h2 {
 		margin: 0;
-		font-size: 1.05rem;
-		color: #1e3a8a;
+		font-size: 1.08rem;
+		font-weight: 700;
+		display: flex;
+		flex-wrap: wrap;
+		column-gap: 0.45rem;
+	}
+	.visao-dot {
+		color: var(--text-3);
+		font-weight: 400;
 	}
 	.visao-meta {
-		display: flex;
-		align-items: center;
-		gap: 0.85rem;
-		flex-wrap: wrap;
-		font-size: 0.85rem;
-		color: #1e40af;
+		font-size: 0.83rem;
+		color: var(--text-2);
 	}
 	.export-btns {
 		display: flex;
-		align-items: center;
 		gap: 0.45rem;
 	}
-	.btn-export {
-		padding: 0.38rem 0.72rem;
-		border-radius: 6px;
-		font-size: 0.79rem;
-		font-weight: 700;
-		cursor: pointer;
-		border: 1px solid transparent;
-		transition: background 0.12s, border-color 0.12s;
-		white-space: nowrap;
-	}
-	.btn-export.xlsx {
-		background: #dcfce7;
-		color: #166534;
-		border-color: #86efac;
-	}
-	.btn-export.xlsx:hover:not(:disabled) {
-		background: #bbf7d0;
-	}
-	.btn-export.pdf {
-		background: #fee2e2;
-		color: #991b1b;
-		border-color: #fca5a5;
-	}
-	.btn-export.pdf:hover:not(:disabled) {
-		background: #fecaca;
-	}
-	.btn-export:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-	.table-wrap {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 8px;
-		overflow-x: auto;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.88rem;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 0.65rem 0.75rem;
-		border-top: 1px solid #e2e8f0;
-		vertical-align: top;
-	}
-	th {
-		background: #f8fafc;
-		font-weight: 600;
-		border-top: none;
-	}
-	tr.row-selected {
-		background: #eff6ff;
-	}
-	.cat {
-		font-size: 0.72rem;
-		font-weight: 700;
-		color: #475569;
-		text-transform: uppercase;
-	}
-	.muted {
-		font-size: 0.78rem;
-		color: #64748b;
-	}
-	.empty {
-		text-align: center;
-		padding: 2rem;
-		color: #64748b;
-	}
-	select {
-		padding: 0.35rem 0.5rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		font-size: 0.82rem;
-	}
-	.status-select.em_deposito {
-		background: #fef3c7;
-		color: #92400e;
-		font-weight: 600;
-	}
-	.status-select.restituido {
-		background: #dcfce7;
-		color: #166534;
-		font-weight: 600;
-	}
-	.status-select.restituido_parcial {
-		background: #e0f2fe;
-		color: #075985;
-		font-weight: 600;
-	}
-	.btn-row-del {
-		background: #fee2e2;
-		color: #b91c1c;
-		border: 1px solid #fecaca;
-		border-radius: 5px;
-		padding: 0.28rem 0.5rem;
-		font-size: 0.75rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.btn-row-del:hover {
-		background: #fecaca;
-	}
-	.paginacao {
-		display: flex;
-		justify-content: space-between;
+	.file-chip {
+		display: inline-flex;
 		align-items: center;
-		gap: 1rem;
-		flex-wrap: wrap;
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 8px;
-		padding: 0.75rem 1rem;
-		margin-top: 0.85rem;
-	}
-	.paginacao-info {
-		font-size: 0.86rem;
-		color: #475569;
-	}
-	.paginacao-botoes {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		flex-wrap: wrap;
-	}
-	.page-btn {
-		padding: 0.42rem 0.75rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		background: #fff;
-		color: #1e293b;
-		font-size: 0.84rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.page-btn:hover:not(:disabled) {
-		background: #eff6ff;
-		border-color: #93c5fd;
-		color: #1d4ed8;
-	}
-	.page-btn.active {
-		background: #2563eb;
-		border-color: #2563eb;
+		justify-content: center;
+		padding: 0.1rem 0.32rem;
+		border-radius: 4px;
+		font-size: 0.6rem;
+		font-weight: 800;
+		letter-spacing: 0.04em;
 		color: #fff;
 	}
-	.page-btn:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
+	.file-chip.xlsx {
+		background: hsl(145 63% 32%);
 	}
-	.page-dots {
-		color: #64748b;
-		padding: 0 0.25rem;
+	.file-chip.pdf {
+		background: hsl(354 70% 46%);
+	}
+
+	/* Tabela de bens */
+	.select-all-mobile {
+		display: none;
+	}
+	.bens-table th.c-check,
+	.bens-table td.c-check {
+		width: 44px;
+		padding-right: 0.25rem;
+	}
+	.bens-table td {
+		vertical-align: top;
+	}
+	.bens-table td.c-check,
+	.bens-table td.c-acoes {
+		padding-top: 0.95rem;
+	}
+	.bens-table .c-acoes {
+		width: 56px;
+		text-align: right;
+	}
+	.bens-table tr.row-selected,
+	.bens-table tr.row-selected:hover {
+		background: var(--primary-soft);
+	}
+	.proc {
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.cat {
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		color: var(--text-3);
+		text-transform: uppercase;
+		margin-bottom: 0.1rem;
+	}
+	.desc {
+		color: var(--text);
+		line-height: 1.45;
+		overflow-wrap: anywhere;
+	}
+	.saldo {
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-2);
+	}
+	.saldo strong {
+		color: var(--text);
+	}
+	.row-select {
+		min-height: 34px;
+		max-width: 190px;
+		padding-top: 0.3rem;
+		padding-bottom: 0.3rem;
+		font-size: 0.82rem;
+	}
+	.status-select {
+		font-weight: 600;
+		border-color: transparent;
+		background-color: var(--surface-3);
+		color: var(--text-2);
+	}
+	.status-select.em_deposito {
+		background-color: var(--warning-soft);
+		color: var(--warning);
+	}
+	.status-select.restituido {
+		background-color: var(--success-soft);
+		color: var(--success);
+	}
+	.status-select.restituido_parcial {
+		background-color: var(--info-soft);
+		color: var(--info);
+	}
+	.status-select.pericia,
+	.status-select.judiciario {
+		background-color: var(--violet-soft);
+		color: var(--violet);
+	}
+	.status-select.destruido {
+		background-color: var(--danger-soft);
+		color: var(--danger);
+	}
+
+	/* Tablet */
+	@media (max-width: 1080px) {
+		.filtros {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.f-busca {
+			grid-column: 1 / -1;
+		}
+		.f-acoes {
+			justify-content: flex-end;
+		}
+	}
+
+	@media (max-width: 960px) {
+		.kpis {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	/* Celular */
+	@media (max-width: 720px) {
+		.head-cta {
+			display: none;
+		}
+		.kpis {
+			gap: 0.55rem;
+			margin-bottom: 0.9rem;
+		}
+		.kpi {
+			padding: 0.75rem;
+			gap: 0.6rem;
+			border-radius: var(--radius);
+		}
+		.kpi-icon {
+			width: 34px;
+			height: 34px;
+			border-radius: 9px;
+		}
+		.kpi-value {
+			font-size: 1.3rem;
+		}
+		.kpi-label {
+			font-size: 0.72rem;
+		}
+
+		.filtros {
+			grid-template-columns: 1fr;
+			padding: 0.75rem;
+		}
+		.f-acoes > * {
+			flex: 1;
+		}
+
+		.bulk-bar {
+			top: calc(var(--header-h) + 6px);
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0.8rem;
+		}
+		.bulk-head {
+			justify-content: space-between;
+		}
+		.bulk-actions {
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.5rem;
+		}
+		.bulk-group {
+			display: grid;
+			grid-template-columns: 1fr auto;
+		}
+		.bulk-group input {
+			grid-column: 1 / -1;
+			grid-row: 2;
+		}
+		.bulk-group :global(.caixa-select) {
+			min-width: 0;
+		}
+		.bulk-group select,
+		.bulk-group input,
+		.bulk-group :global(.trigger) {
+			min-height: 42px;
+			font-size: 16px;
+		}
+		.bulk-sep {
+			display: none;
+		}
+		.bulk-del {
+			width: 100%;
+		}
+
+		.visao {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0.85rem;
+		}
+		.visao-titulo h2 {
+			font-size: 1rem;
+		}
+		.export-btns {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.select-all-mobile {
+			display: flex;
+			align-items: center;
+			gap: 0.55rem;
+			padding: 0.2rem 0.25rem 0.65rem;
+			font-size: 0.85rem;
+			font-weight: 500;
+			color: var(--text-2);
+		}
+
+		/* Card do bem */
+		.bens-table tr:not(.row-empty) {
+			display: grid !important;
+			grid-template-columns: auto 1fr auto;
+			grid-template-areas:
+				'check proc acoes'
+				'desc desc desc'
+				'saldo saldo saldo'
+				'caixa caixa status';
+			column-gap: 0.65rem;
+			row-gap: 0.35rem;
+		}
+		.bens-table td.c-check {
+			grid-area: check;
+			width: auto;
+			padding: 0.1rem 0 0;
+		}
+		.bens-table td.c-proc {
+			grid-area: proc;
+			padding-top: 0;
+		}
+		.bens-table td.c-acoes {
+			grid-area: acoes;
+			width: auto;
+			padding: 0;
+		}
+		.bens-table td.c-desc {
+			grid-area: desc;
+			padding: 0.5rem 0 0.35rem;
+			border-top: 1px solid var(--border) !important;
+			margin-top: 0.3rem;
+		}
+		.bens-table td.c-saldo {
+			grid-area: saldo;
+			display: flex !important;
+			align-items: center;
+			gap: 0.4rem;
+		}
+		.bens-table td.c-saldo::before {
+			display: inline !important;
+			margin: 0 !important;
+		}
+		.bens-table td.c-caixa {
+			grid-area: caixa;
+			min-width: 0;
+		}
+		.bens-table td.c-status {
+			grid-area: status;
+			min-width: 0;
+		}
+		.row-select {
+			width: 100%;
+			max-width: none;
+			min-height: 42px;
+			font-size: 16px;
+		}
+		.bens-table tr.row-selected {
+			border-color: var(--primary-soft-2);
+			box-shadow: 0 0 0 2px var(--primary-soft-2);
+		}
+		.bens-table tr.row-selected:hover {
+			background: var(--primary-soft);
+		}
+	}
+
+	@media (max-width: 400px) {
+		.bens-table tr:not(.row-empty) {
+			grid-template-areas:
+				'check proc acoes'
+				'desc desc desc'
+				'saldo saldo saldo'
+				'caixa caixa caixa'
+				'status status status';
+		}
 	}
 </style>

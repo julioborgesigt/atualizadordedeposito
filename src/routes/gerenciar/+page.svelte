@@ -196,123 +196,131 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Caixas e Apreensões — Custódia PCCE</title>
+</svelte:head>
+
 <div class="page-head">
-	<h1>Gerenciar Caixas e Apreensões</h1>
-	<p class="sub">
-		Crie, renomeie ou exclua caixas físicas do depósito e gerencie os documentos de apreensão e restituição importados.
-	</p>
+	<div>
+		<h1>Caixas e Apreensões</h1>
+		<p class="sub">
+			Crie, renomeie ou exclua caixas físicas do depósito e gerencie os documentos de apreensão e restituição importados.
+		</p>
+	</div>
 </div>
 
 {#if feedback}
-	<div class="alert {feedback.tipo === 'ok' ? 'success' : 'error'}">
+	<div class="alert {feedback.tipo === 'ok' ? 'success' : 'error'}" role="status">
 		<span>{feedback.texto}</span>
-		<button type="button" class="close-btn" onclick={() => (feedback = null)}>×</button>
+		<button type="button" class="close-btn" aria-label="Fechar aviso" onclick={() => (feedback = null)}>×</button>
 	</div>
 {/if}
 
-<section class="panel">
+<section class="panel" aria-labelledby="titulo-caixas">
 	<div class="panel-top">
 		<div class="panel-title">
 			<div class="title-row">
-				<h2>Caixas Físicas</h2>
+				<h2 id="titulo-caixas">Caixas físicas</h2>
 				<span class="count-pill">{data.caixas.length}</span>
 			</div>
 			<p>Organize os locais físicos de armazenamento dos bens apreendidos.</p>
 		</div>
 
 		<div class="toolbar">
-			<input
-				type="search"
-				class="search-input"
-				bind:value={buscaCaixa}
-				oninput={() => (paginaCaixas = 1)}
-				placeholder="Pesquisar caixa pelo nome..."
-			/>
+			<div class="search-wrap">
+				<svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+				<input
+					id="busca-caixa"
+					type="search"
+					bind:value={buscaCaixa}
+					oninput={() => (paginaCaixas = 1)}
+					placeholder="Pesquisar caixa pelo nome..."
+					aria-label="Pesquisar caixa"
+				/>
+			</div>
 
 			<div class="criar-caixa-bar">
 				<input
+					id="nova-caixa"
 					type="text"
 					bind:value={novaCaixaNome}
 					placeholder="Nova caixa (ex: Caixa 02 - Operação X)"
+					aria-label="Nome da nova caixa"
 					onkeydown={(e) => e.key === 'Enter' && criarNovaCaixa()}
 				/>
-				<button type="button" onclick={criarNovaCaixa}>+ Criar Caixa</button>
+				<button type="button" class="btn btn-primary" onclick={criarNovaCaixa} disabled={!novaCaixaNome.trim()}>
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+					Criar caixa
+				</button>
 			</div>
 		</div>
 	</div>
 
-	<div class="table-wrap">
-		<table>
+	<div class="table-wrap cards">
+		<table class="table caixas-table">
 			<thead>
 				<tr>
-					<th>Nome da Caixa</th>
-					<th class="col-metric">Total de Bens</th>
-					<th class="col-metric">Em Depósito</th>
+					<th>Nome da caixa</th>
+					<th class="col-metric">Total</th>
+					<th class="col-metric">Em depósito</th>
 					<th class="col-metric">Restituídos</th>
 					<th class="col-actions">Ações</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#if caixasPaginadas.length === 0}
-					<tr>
+					<tr class="row-empty">
 						<td colspan="5" class="empty">Nenhuma caixa encontrada.</td>
 					</tr>
 				{/if}
 				{#each caixasPaginadas as cx (cx.id)}
 					<tr>
-						<td>
+						<td class="c-nome">
 							{#if editandoCaixaId === cx.id}
 								<div class="inline-edit">
 									<input
 										type="text"
 										bind:value={editandoCaixaNome}
+										aria-label="Novo nome da caixa"
 										onkeydown={(e) => e.key === 'Enter' && salvarRenomearCaixa(cx.id)}
 									/>
-									<button
-										type="button"
-										class="btn-action primary"
-										onclick={() => salvarRenomearCaixa(cx.id)}
-									>
-										Salvar
-									</button>
-									<button
-										type="button"
-										class="btn-action"
-										onclick={() => (editandoCaixaId = null)}
-									>
-										Cancelar
-									</button>
+									<div class="inline-edit-btns">
+										<button type="button" class="btn btn-primary btn-sm" onclick={() => salvarRenomearCaixa(cx.id)}>
+											Salvar
+										</button>
+										<button type="button" class="btn btn-secondary btn-sm" onclick={() => (editandoCaixaId = null)}>
+											Cancelar
+										</button>
+									</div>
 								</div>
 							{:else}
 								<div class="caixa-name-cell">
-									<span class="box-icon">📦</span>
-									<div>
+									<span class="box-icon" aria-hidden="true">
+										<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>
+									</span>
+									<div class="caixa-name-text">
 										<strong class="caixa-title">{cx.nome}</strong>
 										<span class="caixa-sub">{cx.setor ?? 'Depósito'}</span>
 									</div>
 								</div>
 							{/if}
 						</td>
-						<td class="col-metric">
+						<td class="col-metric c-total" data-label="Total">
 							<span class="metric-pill slate">{cx.total_bens}</span>
 						</td>
-						<td class="col-metric">
-							<span class="metric-pill {cx.em_deposito > 0 ? 'amber' : 'muted-pill'}">
-								{cx.em_deposito}
-							</span>
+						<td class="col-metric c-dep" data-label="Em depósito">
+							<span class="metric-pill {cx.em_deposito > 0 ? 'amber' : 'muted-pill'}">{cx.em_deposito}</span>
 						</td>
-						<td class="col-metric">
-							<span class="metric-pill {cx.restituidos > 0 ? 'green' : 'muted-pill'}">
-								{cx.restituidos}
-							</span>
+						<td class="col-metric c-rest" data-label="Restituídos">
+							<span class="metric-pill {cx.restituidos > 0 ? 'green' : 'muted-pill'}">{cx.restituidos}</span>
 						</td>
-						<td class="col-actions">
+						<td class="col-actions c-acoes">
 							{#if confirmandoExclusaoCaixaId === cx.id}
 								<div class="confirm-delete-row">
-									<span class="confirm-label">Excluir:</span>
+									<span class="confirm-label">Excluir caixa:</span>
 									<button
 										type="button"
-										class="btn-action warn"
+										class="btn btn-warn btn-sm"
 										onclick={() => excluirCaixa(cx.id, cx.nome, cx.total_bens, false)}
 										title="Exclui apenas a caixa e mantém os bens sem caixa"
 									>
@@ -320,26 +328,22 @@
 									</button>
 									<button
 										type="button"
-										class="btn-action danger"
+										class="btn btn-danger-solid btn-sm"
 										onclick={() => excluirCaixa(cx.id, cx.nome, cx.total_bens, true)}
 										title="Exclui a caixa e todos os bens dentro dela"
 									>
 										Caixa + {cx.total_bens} bem(ns)
 									</button>
-									<button
-										type="button"
-										class="btn-action"
-										onclick={() => (confirmandoExclusaoCaixaId = null)}
-									>
+									<button type="button" class="btn btn-ghost btn-sm" onclick={() => (confirmandoExclusaoCaixaId = null)}>
 										Cancelar
 									</button>
 								</div>
 							{:else}
 								<div class="actions-row">
-									<a href="/?caixa={cx.id}" class="btn-action link">Ver itens</a>
+									<a href="/?caixa={cx.id}" class="btn btn-soft btn-sm">Ver itens</a>
 									<button
 										type="button"
-										class="btn-action"
+										class="btn btn-secondary btn-sm"
 										onclick={() => {
 											confirmandoExclusaoCaixaId = null;
 											editandoCaixaId = cx.id;
@@ -349,17 +353,13 @@
 										Renomear
 									</button>
 									{#if cx.total_bens === 0}
-										<button
-											type="button"
-											class="btn-action danger"
-											onclick={() => excluirCaixa(cx.id, cx.nome, 0, false)}
-										>
+										<button type="button" class="btn btn-danger btn-sm" onclick={() => excluirCaixa(cx.id, cx.nome, 0, false)}>
 											Excluir
 										</button>
 									{:else}
 										<button
 											type="button"
-											class="btn-action danger"
+											class="btn btn-danger btn-sm"
 											onclick={() => {
 												editandoCaixaId = null;
 												confirmandoExclusaoCaixaId = cx.id;
@@ -382,7 +382,7 @@
 			<span class="paginacao-info">
 				Exibindo
 				<strong>{(paginaCaixasSegura - 1) * POR_PAGINA + 1}–{Math.min(paginaCaixasSegura * POR_PAGINA, caixasFiltradas.length)}</strong>
-				de <strong>{caixasFiltradas.length}</strong> caixas (Página {paginaCaixasSegura} de {totalPaginasCaixas})
+				de <strong>{caixasFiltradas.length}</strong> caixas
 			</span>
 			<div class="paginacao-botoes">
 				<button
@@ -396,8 +396,9 @@
 				{#each gerarPaginas(paginaCaixasSegura, totalPaginasCaixas) as p}
 					<button
 						type="button"
-						class="page-btn"
+						class="page-btn num"
 						class:active={p === paginaCaixasSegura}
+						aria-current={p === paginaCaixasSegura ? 'page' : undefined}
 						onclick={() => (paginaCaixas = p)}
 					>
 						{p}
@@ -416,39 +417,43 @@
 	{/if}
 </section>
 
-<section class="panel">
+<section class="panel" aria-labelledby="titulo-docs">
 	<div class="panel-top">
 		<div class="panel-title">
 			<div class="title-row">
-				<h2>Documentos Importados — Apreensões e Restituições</h2>
+				<h2 id="titulo-docs">Documentos importados</h2>
 				<span class="count-pill">{data.documentos.length}</span>
 			</div>
 			<p>
-				Ao excluir uma apreensão, os bens vinculados a ela são removidos e o arquivo PDF fica liberado para reimportação.
+				Apreensões e restituições. Ao excluir uma apreensão, os bens vinculados são removidos e o PDF fica liberado para reimportação.
 			</p>
 		</div>
 
 		{#if data.documentos.length > 0}
 			<div class="toolbar">
-				<input
-					type="search"
-					class="search-input"
-					bind:value={buscaDoc}
-					oninput={() => (paginaDocs = 1)}
-					placeholder="Pesquisar por BO/IP, arquivo PDF, caixa ou parte..."
-				/>
+				<div class="search-wrap wide">
+					<svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+					<input
+						id="busca-documento"
+						type="search"
+						bind:value={buscaDoc}
+						oninput={() => (paginaDocs = 1)}
+						placeholder="Pesquisar por BO/IP, arquivo PDF, caixa ou parte..."
+						aria-label="Pesquisar documento"
+					/>
+				</div>
 			</div>
 		{/if}
 	</div>
 
-	<div class="table-wrap">
-		<table>
+	<div class="table-wrap cards">
+		<table class="table docs-table">
 			<thead>
 				<tr>
 					<th>Tipo</th>
 					<th>Procedimento</th>
 					<th>Arquivo PDF</th>
-					<th>Data do Ato</th>
+					<th>Data do ato</th>
 					<th>Caixa(s)</th>
 					<th class="col-metric">Bens</th>
 					<th class="col-actions">Ações</th>
@@ -456,66 +461,56 @@
 			</thead>
 			<tbody>
 				{#if documentosPaginados.length === 0}
-					<tr>
+					<tr class="row-empty">
 						<td colspan="7" class="empty">Nenhum documento importado encontrado.</td>
 					</tr>
 				{/if}
 				{#each documentosPaginados as doc (doc.id)}
 					<tr>
-						<td>
+						<td class="d-tipo">
 							<span class="badge {doc.doc_tipo === 'APREENSAO' ? 'blue' : 'green'}">
 								{doc.doc_tipo === 'APREENSAO' ? 'APREENSÃO' : 'RESTITUIÇÃO'}
 							</span>
 						</td>
-						<td>
-							<strong>{doc.proc_tipo} {doc.proc_numero}</strong>
+						<td class="d-proc">
+							<strong class="proc">{doc.proc_tipo} {doc.proc_numero}</strong>
 							{#if doc.operacao}
 								<div class="muted">{doc.operacao}</div>
 							{/if}
 						</td>
-						<td>
+						<td class="d-arq" data-label="Arquivo">
 							<div class="file-name">{doc.nome_arquivo}</div>
 							{#if doc.parte_nome}
 								<div class="muted">{doc.parte_nome}</div>
 							{/if}
 						</td>
-						<td>{doc.data_ato ?? '-'}</td>
-						<td>
+						<td class="d-data" data-label="Data do ato">{doc.data_ato ?? '—'}</td>
+						<td class="d-caixa" data-label="Caixa(s)">
 							{#if doc.caixas_nomes}
-								<span class="caixa-badge">{doc.caixas_nomes}</span>
+								<span class="badge purple caixa-badge">{doc.caixas_nomes}</span>
 							{:else}
 								<span class="muted">Sem caixa</span>
 							{/if}
 						</td>
-						<td class="col-metric">
+						<td class="col-metric d-bens" data-label="Bens">
 							<span class="metric-pill slate">{doc.qtd_bens}</span>
 						</td>
-						<td class="col-actions">
+						<td class="col-actions d-acoes">
 							<div class="actions-row">
 								<a
 									href="/?procedimento={doc.proc_id}"
-									class="btn-action icon-btn link"
+									class="btn btn-soft btn-sm btn-icon"
 									title="Ver procedimento ({doc.proc_tipo} {doc.proc_numero})"
 									aria-label="Ver procedimento"
 								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="16"
-										height="16"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
+									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 										<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
 										<circle cx="12" cy="12" r="3" />
 									</svg>
 								</a>
 								<button
 									type="button"
-									class="btn-action danger"
+									class="btn btn-danger btn-sm"
 									onclick={() =>
 										excluirDocumento(
 											doc.id,
@@ -525,7 +520,7 @@
 											doc.qtd_bens
 										)}
 								>
-									Excluir {doc.doc_tipo === 'APREENSAO' ? 'Apreensão' : 'Restituição'}
+									Excluir {doc.doc_tipo === 'APREENSAO' ? 'apreensão' : 'restituição'}
 								</button>
 							</div>
 						</td>
@@ -540,7 +535,7 @@
 			<span class="paginacao-info">
 				Exibindo
 				<strong>{(paginaDocsSegura - 1) * POR_PAGINA + 1}–{Math.min(paginaDocsSegura * POR_PAGINA, documentosFiltrados.length)}</strong>
-				de <strong>{documentosFiltrados.length}</strong> documentos (Página {paginaDocsSegura} de {totalPaginasDocs})
+				de <strong>{documentosFiltrados.length}</strong> documentos
 			</span>
 			<div class="paginacao-botoes">
 				<button
@@ -554,8 +549,9 @@
 				{#each gerarPaginas(paginaDocsSegura, totalPaginasDocs) as p}
 					<button
 						type="button"
-						class="page-btn"
+						class="page-btn num"
 						class:active={p === paginaDocsSegura}
+						aria-current={p === paginaDocsSegura ? 'page' : undefined}
 						onclick={() => (paginaDocs = p)}
 					>
 						{p}
@@ -575,57 +571,11 @@
 </section>
 
 <style>
-	.page-head {
-		margin-bottom: 1.25rem;
-	}
-	h1 {
-		margin: 0 0 0.25rem;
-		font-size: 1.5rem;
-		color: #0f172a;
-	}
-	.sub {
-		margin: 0;
-		color: #475569;
-		font-size: 0.95rem;
-	}
-	.alert {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-weight: 500;
-		font-size: 0.9rem;
-	}
-	.alert.success {
-		background: #dcfce7;
-		color: #166534;
-	}
-	.alert.error {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-	.close-btn {
-		background: transparent;
-		border: none;
-		font-size: 1.2rem;
-		cursor: pointer;
-		color: inherit;
-	}
-	.panel {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 12px;
-		padding: 1.35rem;
-		margin-bottom: 1.5rem;
-		box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-	}
 	.panel-top {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 1.1rem;
+		gap: 0.9rem;
+		margin-bottom: 1rem;
 	}
 	.title-row {
 		display: flex;
@@ -635,314 +585,284 @@
 	}
 	.panel-title h2 {
 		margin: 0;
-		font-size: 1.15rem;
-		color: #0f172a;
-	}
-	.count-pill {
-		background: #e2e8f0;
-		color: #334155;
-		font-size: 0.78rem;
+		font-size: 1.1rem;
 		font-weight: 700;
-		padding: 0.15rem 0.55rem;
-		border-radius: 999px;
 	}
 	.panel-title p {
 		margin: 0;
-		font-size: 0.87rem;
-		color: #64748b;
+		font-size: 0.86rem;
+		color: var(--text-2);
 	}
+
 	.toolbar {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		gap: 0.85rem;
+		gap: 0.75rem;
 		flex-wrap: wrap;
-		background: #f8fafc;
-		padding: 0.75rem;
-		border-radius: 8px;
-		border: 1px solid #e2e8f0;
 	}
-	.search-input {
-		flex: 1;
-		min-width: 240px;
+	.search-wrap {
+		position: relative;
+		flex: 1 1 260px;
 		max-width: 380px;
-		padding: 0.55rem 0.75rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		font-size: 0.88rem;
-		background: #fff;
+	}
+	.search-wrap.wide {
+		max-width: 520px;
+	}
+	.search-wrap input {
+		width: 100%;
+		padding-left: 2.2rem;
+	}
+	.search-icon {
+		position: absolute;
+		left: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--text-3);
+		pointer-events: none;
 	}
 	.criar-caixa-bar {
 		display: flex;
 		gap: 0.5rem;
-		flex: 1;
-		min-width: 280px;
-		max-width: 440px;
+		flex: 1 1 320px;
+		max-width: 460px;
 	}
 	.criar-caixa-bar input {
 		flex: 1;
-		padding: 0.55rem 0.75rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		font-size: 0.88rem;
-		background: #fff;
+		min-width: 0;
 	}
-	.criar-caixa-bar button {
-		background: #2563eb;
-		color: #fff;
-		border: none;
-		padding: 0.55rem 1rem;
-		border-radius: 6px;
-		font-weight: 600;
-		font-size: 0.88rem;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.criar-caixa-bar button:hover {
-		background: #1d4ed8;
-	}
-	.table-wrap {
-		border: 1px solid #e2e8f0;
-		border-radius: 8px;
-		overflow-x: auto;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.88rem;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 0.8rem 1rem;
-		border-top: 1px solid #e2e8f0;
-		vertical-align: middle;
-	}
-	th {
-		background: #f8fafc;
-		color: #475569;
-		font-weight: 600;
-		font-size: 0.82rem;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
-		border-top: none;
-	}
-	tbody tr:hover {
-		background: #f8fafc;
-	}
+
 	.col-metric {
-		text-align: center;
-		width: 130px;
+		text-align: center !important;
+		width: 120px;
 	}
 	.col-actions {
-		text-align: right;
+		text-align: right !important;
 		white-space: nowrap;
 		width: 1%;
 	}
+
 	.caixa-name-cell {
 		display: flex;
 		align-items: center;
-		gap: 0.65rem;
+		gap: 0.7rem;
+		min-width: 0;
 	}
 	.box-icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 34px;
-		height: 34px;
-		background: #eff6ff;
-		border: 1px solid #bfdbfe;
-		border-radius: 8px;
-		font-size: 1rem;
+		width: 38px;
+		height: 38px;
 		flex-shrink: 0;
+		border-radius: 10px;
+		background: linear-gradient(145deg, var(--primary-soft), var(--primary-soft-2));
+		color: var(--primary);
+	}
+	.caixa-name-text {
+		min-width: 0;
 	}
 	.caixa-title {
 		display: block;
-		font-size: 0.94rem;
-		color: #0f172a;
+		font-size: 0.93rem;
+		font-weight: 600;
+		overflow-wrap: anywhere;
 	}
 	.caixa-sub {
 		display: block;
 		font-size: 0.76rem;
-		color: #64748b;
+		color: var(--text-3);
 	}
+
 	.metric-pill {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		min-width: 32px;
-		padding: 0.22rem 0.65rem;
-		border-radius: 999px;
+		min-width: 34px;
+		padding: 0.2rem 0.65rem;
+		border-radius: var(--radius-pill);
 		font-weight: 700;
-		font-size: 0.83rem;
+		font-size: 0.82rem;
+		font-variant-numeric: tabular-nums;
 	}
 	.metric-pill.slate {
-		background: #f1f5f9;
-		color: #0f172a;
-		border: 1px solid #cbd5e1;
+		background: var(--surface-3);
+		color: var(--text);
 	}
 	.metric-pill.amber {
-		background: #fef3c7;
-		color: #92400e;
-		border: 1px solid #fde68a;
+		background: var(--warning-soft);
+		color: var(--warning);
 	}
 	.metric-pill.green {
-		background: #dcfce7;
-		color: #166534;
-		border: 1px solid #bbf7d0;
+		background: var(--success-soft);
+		color: var(--success);
 	}
 	.metric-pill.muted-pill {
-		background: #f8fafc;
-		color: #94a3b8;
-		border: 1px solid #e2e8f0;
+		background: transparent;
+		color: var(--text-3);
 		font-weight: 500;
 	}
+
 	.caixa-badge {
-		display: inline-block;
-		background: #f3e8ff;
-		color: #6b21a8;
+		white-space: normal;
+		letter-spacing: 0;
 		font-weight: 600;
-		font-size: 0.78rem;
-		padding: 0.2rem 0.55rem;
-		border-radius: 6px;
+	}
+	.proc {
+		font-weight: 600;
+		white-space: nowrap;
 	}
 	.file-name {
 		font-weight: 500;
-		color: #1e293b;
+		overflow-wrap: anywhere;
 	}
-	.empty {
-		text-align: center;
-		padding: 2rem;
-		color: #64748b;
-	}
-	.muted {
-		font-size: 0.78rem;
-		color: #64748b;
-	}
+
 	.actions-row,
-	.confirm-delete-row,
-	.inline-edit {
+	.confirm-delete-row {
 		display: inline-flex;
 		gap: 0.4rem;
 		align-items: center;
-		flex-wrap: nowrap;
+		justify-content: flex-end;
+	}
+	.confirm-delete-row {
+		flex-wrap: wrap;
 	}
 	.confirm-label {
 		font-size: 0.78rem;
 		font-weight: 700;
-		color: #991b1b;
-		margin-right: 0.15rem;
+		color: var(--danger);
+	}
+	.inline-edit {
+		display: flex;
+		gap: 0.4rem;
+		align-items: center;
+		flex-wrap: wrap;
 	}
 	.inline-edit input {
-		padding: 0.4rem 0.6rem;
-		border: 1px solid #93c5fd;
-		border-radius: 6px;
-		font-size: 0.86rem;
+		flex: 1 1 180px;
+		min-height: 34px;
 	}
-	.btn-action {
-		padding: 0.38rem 0.7rem;
-		font-size: 0.8rem;
-		border-radius: 6px;
-		border: 1px solid #cbd5e1;
-		background: #fff;
-		color: #334155;
-		cursor: pointer;
-		font-weight: 600;
-		text-decoration: none;
-		display: inline-flex;
-		align-items: center;
-		white-space: nowrap;
-		transition: background 0.12s, border-color 0.12s;
-	}
-	.btn-action:hover {
-		background: #f1f5f9;
-	}
-	.btn-action.icon-btn {
-		padding: 0.38rem 0.52rem;
-		justify-content: center;
-	}
-	.btn-action.link {
-		background: #eff6ff;
-		border-color: #bfdbfe;
-		color: #1d4ed8;
-	}
-	.btn-action.link:hover {
-		background: #dbeafe;
-	}
-	.btn-action.primary {
-		background: #2563eb;
-		color: #fff;
-		border-color: #2563eb;
-	}
-	.btn-action.warn {
-		background: #fef3c7;
-		color: #92400e;
-		border-color: #fcd34d;
-	}
-	.btn-action.danger {
-		background: #fff1f2;
-		color: #be123c;
-		border-color: #fecdd3;
-	}
-	.btn-action.danger:hover {
-		background: #ffe4e6;
-	}
-	.badge {
-		display: inline-block;
-		padding: 0.2rem 0.55rem;
-		border-radius: 999px;
-		font-size: 0.74rem;
-		font-weight: 700;
-	}
-	.badge.blue {
-		background: #dbeafe;
-		color: #1d4ed8;
-	}
-	.badge.green {
-		background: #dcfce7;
-		color: #15803d;
-	}
-	.paginacao {
+	.inline-edit-btns {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
-		flex-wrap: wrap;
-		padding-top: 0.9rem;
-		margin-top: 0.9rem;
-		border-top: 1px solid #e2e8f0;
+		gap: 0.4rem;
 	}
-	.paginacao-info {
-		font-size: 0.84rem;
-		color: #475569;
-	}
-	.paginacao-botoes {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-	}
-	.page-btn {
-		padding: 0.38rem 0.7rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		background: #fff;
-		color: #1e293b;
-		font-size: 0.82rem;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.page-btn:hover:not(:disabled) {
-		background: #eff6ff;
-		border-color: #93c5fd;
-		color: #1d4ed8;
-	}
-	.page-btn.active {
-		background: #2563eb;
-		border-color: #2563eb;
-		color: #fff;
-	}
-	.page-btn:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
+
+	@media (max-width: 720px) {
+		.search-wrap,
+		.search-wrap.wide,
+		.criar-caixa-bar {
+			max-width: none;
+			flex-basis: 100%;
+		}
+		.criar-caixa-bar {
+			flex-direction: column;
+		}
+
+		/* Cards de caixa */
+		.caixas-table tr:not(.row-empty) {
+			display: grid !important;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			grid-template-areas:
+				'nome nome nome'
+				'total dep rest'
+				'acoes acoes acoes';
+			gap: 0.5rem;
+		}
+		.caixas-table .c-nome {
+			grid-area: nome;
+		}
+		.caixas-table .c-total {
+			grid-area: total;
+		}
+		.caixas-table .c-dep {
+			grid-area: dep;
+		}
+		.caixas-table .c-rest {
+			grid-area: rest;
+		}
+		.caixas-table .col-metric {
+			width: auto;
+			background: var(--surface-2);
+			border: 1px solid var(--border) !important;
+			border-radius: var(--radius-sm);
+			padding: 0.45rem 0.3rem !important;
+		}
+		.caixas-table .c-acoes {
+			grid-area: acoes;
+			width: auto;
+			text-align: left !important;
+			white-space: normal;
+		}
+
+		/* Cards de documento */
+		.docs-table tr:not(.row-empty) {
+			display: grid !important;
+			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-areas:
+				'tipo bens'
+				'proc proc'
+				'arq arq'
+				'data caixa'
+				'acoes acoes';
+			column-gap: 0.75rem;
+			row-gap: 0.25rem;
+		}
+		.docs-table .d-tipo {
+			grid-area: tipo;
+		}
+		.docs-table .d-proc {
+			grid-area: proc;
+		}
+		.docs-table .d-arq {
+			grid-area: arq;
+		}
+		.docs-table .d-data {
+			grid-area: data;
+		}
+		.docs-table .d-caixa {
+			grid-area: caixa;
+			min-width: 0;
+		}
+		.docs-table .d-bens {
+			grid-area: bens;
+			width: auto;
+			display: flex !important;
+			align-items: center;
+			gap: 0.35rem;
+			justify-content: flex-end;
+		}
+		.docs-table .d-bens::before {
+			margin: 0 !important;
+		}
+		.docs-table .d-acoes {
+			grid-area: acoes;
+			width: auto;
+			padding-top: 0.6rem !important;
+			margin-top: 0.3rem;
+			border-top: 1px solid var(--border) !important;
+		}
+
+		.actions-row,
+		.confirm-delete-row {
+			display: flex;
+			width: 100%;
+			flex-wrap: wrap;
+		}
+		.actions-row > :global(*),
+		.confirm-delete-row > .btn {
+			flex: 1 1 auto;
+		}
+		.actions-row > .btn-icon {
+			flex: 0 0 auto;
+		}
+		.confirm-label {
+			width: 100%;
+		}
+		.inline-edit-btns {
+			width: 100%;
+		}
+		.inline-edit-btns > .btn {
+			flex: 1;
+		}
 	}
 </style>

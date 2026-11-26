@@ -131,26 +131,34 @@
 <style>
 	.caixa-select {
 		position: relative;
-		min-width: 220px;
+		min-width: min(220px, 100%);
 	}
 	.trigger {
 		width: 100%;
+		min-height: 40px;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		gap: 0.6rem;
-		padding: 0.55rem 0.8rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		background: #fff;
-		color: #1e293b;
-		font-size: 0.88rem;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font-size: 0.9rem;
 		cursor: pointer;
 		text-align: left;
+		transition:
+			border-color 0.15s,
+			box-shadow 0.15s;
+	}
+	.trigger:hover {
+		border-color: hsl(220 14% 70%);
 	}
 	.trigger.open,
-	.trigger:focus {
-		border-color: #2563eb;
+	.trigger:focus-visible {
+		border-color: var(--primary);
+		box-shadow: var(--ring);
 		outline: none;
 	}
 	.trigger-label {
@@ -160,71 +168,101 @@
 	}
 	.chevron {
 		font-size: 0.78rem;
-		color: #64748b;
+		color: var(--text-3);
 		flex-shrink: 0;
+		transition: transform 0.15s;
+	}
+	.trigger.open .chevron {
+		transform: rotate(180deg);
 	}
 	.dropdown {
 		position: absolute;
-		top: calc(100% + 4px);
+		top: calc(100% + 6px);
 		left: 0;
 		right: 0;
-		min-width: 250px;
-		background: #fff;
-		border: 1px solid #cbd5e1;
-		border-radius: 8px;
-		box-shadow: 0 10px 25px rgba(15, 23, 42, 0.14);
+		min-width: min(260px, calc(100vw - 2rem));
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-lg);
 		z-index: 50;
 		overflow: hidden;
+		animation: dd-in 0.14s ease-out;
+	}
+	@keyframes dd-in {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
 	}
 	.search-box {
 		padding: 0.5rem;
-		border-bottom: 1px solid #e2e8f0;
-		background: #f8fafc;
+		border-bottom: 1px solid var(--border);
+		background: var(--surface-2);
 	}
 	.search-box input {
 		width: 100%;
-		box-sizing: border-box;
-		padding: 0.45rem 0.6rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		font-size: 0.84rem;
-		background: #fff;
-	}
-	.search-box input:focus {
-		border-color: #2563eb;
-		outline: none;
+		min-height: 36px;
+		font-size: 0.86rem;
 	}
 	.options-list {
 		list-style: none;
 		margin: 0;
-		padding: 0.25rem 0;
-		max-height: 230px;
+		padding: 0.3rem;
+		max-height: 260px;
 		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 	.option-btn {
 		width: 100%;
 		text-align: left;
 		background: transparent;
 		border: none;
-		padding: 0.5rem 0.75rem;
-		font-size: 0.85rem;
-		color: #1e293b;
+		border-radius: 6px;
+		padding: 0.55rem 0.65rem;
+		font-size: 0.86rem;
+		color: var(--text);
 		cursor: pointer;
 		display: block;
 	}
 	.option-btn:hover {
-		background: #eff6ff;
-		color: #1d4ed8;
+		background: var(--primary-soft);
+		color: var(--primary-text);
 	}
 	.option-btn.active {
-		background: #2563eb;
+		background: var(--primary);
 		color: #fff;
 		font-weight: 600;
 	}
 	.no-results {
-		padding: 0.7rem 0.75rem;
-		font-size: 0.82rem;
-		color: #64748b;
+		padding: 0.8rem 0.75rem;
+		font-size: 0.84rem;
+		color: var(--text-3);
 		text-align: center;
+	}
+
+	@media (max-width: 720px) {
+		.caixa-select {
+			width: 100%;
+		}
+		.trigger {
+			min-height: 44px;
+			font-size: 16px;
+		}
+		.search-box input {
+			font-size: 16px;
+			min-height: 42px;
+		}
+		.option-btn {
+			padding: 0.75rem 0.7rem;
+			font-size: 0.95rem;
+		}
+		.options-list {
+			max-height: min(320px, 50vh);
+		}
 	}
 </style>

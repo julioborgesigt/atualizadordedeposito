@@ -1,22 +1,92 @@
 <script lang="ts">
+	import '../app.css';
 	import { page } from '$app/state';
+	import { afterNavigate } from '$app/navigation';
+
 	let { children } = $props();
+
+	let menuAberto = $state(false);
+
+	const links = [
+		{ href: '/', label: 'Depósito / Bens', curto: 'Bens', icon: 'bens' },
+		{ href: '/gerenciar', label: 'Caixas e Apreensões', curto: 'Gerenciar', icon: 'caixas' },
+		{ href: '/importar', label: 'Importar PDFs', curto: 'Importar', icon: 'importar' }
+	] as const;
+
+	afterNavigate(() => {
+		menuAberto = false;
+	});
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') menuAberto = false;
+	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="shell">
 	<header class="topbar">
-		<div class="brand">
-			<strong>Custódia PCCE</strong>
-			<span>Controle de Apreensões e Restituições</span>
-		</div>
-		<nav>
-			<a href="/" class:active={page.url.pathname === '/'}>Depósito / Bens</a>
-			<a href="/gerenciar" class:active={page.url.pathname === '/gerenciar'}>
-				Gerenciar Caixas e Apreensões
+		<div class="topbar-inner">
+			<a href="/" class="brand" aria-label="Custódia PCCE — página inicial">
+				<span class="brand-mark" aria-hidden="true">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+						<path d="m9 12 2 2 4-4" />
+					</svg>
+				</span>
+				<span class="brand-text">
+					<strong>Custódia PCCE</strong>
+					<span>Apreensões e Restituições</span>
+				</span>
 			</a>
-			<a href="/importar" class:active={page.url.pathname === '/importar'}>+ Importar PDFs</a>
-		</nav>
+
+			<button
+				type="button"
+				class="menu-toggle"
+				aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
+				aria-expanded={menuAberto}
+				aria-controls="nav-principal"
+				onclick={() => (menuAberto = !menuAberto)}
+			>
+				{#if menuAberto}
+					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+				{:else}
+					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+				{/if}
+			</button>
+
+			<nav id="nav-principal" class="nav" class:open={menuAberto} aria-label="Navegação principal">
+				{#each links as link}
+					<a
+						href={link.href}
+						class="nav-link"
+						class:active={page.url.pathname === link.href}
+						aria-current={page.url.pathname === link.href ? 'page' : undefined}
+					>
+						<span class="nav-icon" aria-hidden="true">
+							{#if link.icon === 'bens'}
+								<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /></svg>
+							{:else if link.icon === 'caixas'}
+								<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>
+							{:else}
+								<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5M12 3v12" /></svg>
+							{/if}
+						</span>
+						{link.label}
+					</a>
+				{/each}
+			</nav>
+		</div>
 	</header>
+
+	{#if menuAberto}
+		<button
+			type="button"
+			class="nav-backdrop"
+			aria-label="Fechar menu"
+			onclick={() => (menuAberto = false)}
+		></button>
+	{/if}
 
 	<main class="content">
 		{@render children()}
@@ -24,50 +94,206 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-		background: #f4f6f9;
-		color: #1e293b;
+	.shell {
+		min-height: 100vh;
+		min-height: 100dvh;
 	}
+
 	.topbar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.9rem 1.5rem;
-		background: #0f172a;
-		color: #fff;
-		gap: 1rem;
-		flex-wrap: wrap;
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		background: linear-gradient(180deg, hsl(222 47% 12%), hsl(222 47% 9.5%));
+		border-bottom: 1px solid hsl(222 30% 20%);
+		box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03) inset, 0 4px 16px hsl(222 50% 5% / 0.18);
+		padding-top: env(safe-area-inset-top);
 	}
+
+	.topbar-inner {
+		max-width: 1240px;
+		height: var(--header-h);
+		margin: 0 auto;
+		padding: 0 1.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
 	.brand {
 		display: flex;
-		flex-direction: column;
-	}
-	.brand span {
-		font-size: 0.8rem;
-		color: #94a3b8;
-	}
-	nav {
-		display: flex;
-		gap: 0.75rem;
-	}
-	nav a {
-		color: #cbd5e1;
+		align-items: center;
+		gap: 0.7rem;
 		text-decoration: none;
-		padding: 0.45rem 0.9rem;
-		border-radius: 6px;
-		font-weight: 500;
-		font-size: 0.9rem;
+		color: #fff;
+		min-width: 0;
 	}
-	nav a:hover,
-	nav a.active {
-		background: #2563eb;
+
+	.brand-mark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
+		border-radius: 10px;
+		background: linear-gradient(145deg, hsl(221 80% 56%), hsl(224 76% 42%));
+		box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.22), 0 2px 8px hsl(221 80% 40% / 0.4);
 		color: #fff;
 	}
+
+	.brand-text {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.2;
+		min-width: 0;
+	}
+
+	.brand-text strong {
+		font-size: 0.98rem;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+
+	.brand-text span {
+		font-size: 0.74rem;
+		color: hsl(220 15% 64%);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.nav {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.nav-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.85rem;
+		border-radius: 8px;
+		color: hsl(220 18% 76%);
+		text-decoration: none;
+		font-size: 0.875rem;
+		font-weight: 500;
+		transition:
+			background 0.15s,
+			color 0.15s;
+	}
+
+	.nav-icon {
+		display: inline-flex;
+		opacity: 0.8;
+	}
+
+	.nav-link:hover {
+		background: hsl(0 0% 100% / 0.07);
+		color: #fff;
+	}
+
+	.nav-link.active {
+		background: hsl(0 0% 100% / 0.11);
+		color: #fff;
+		box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.06);
+	}
+
+	.nav-link.active .nav-icon {
+		opacity: 1;
+		color: hsl(213 94% 72%);
+	}
+
+	.menu-toggle {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 42px;
+		height: 42px;
+		border: 1px solid hsl(0 0% 100% / 0.12);
+		border-radius: 10px;
+		background: hsl(0 0% 100% / 0.05);
+		color: #fff;
+		cursor: pointer;
+	}
+
+	.nav-backdrop {
+		display: none;
+	}
+
 	.content {
-		max-width: 1200px;
-		margin: 1.5rem auto;
-		padding: 0 1rem 3rem;
+		max-width: 1240px;
+		margin: 0 auto;
+		padding: 1.6rem 1.25rem 4rem;
+	}
+
+	@media (max-width: 860px) {
+		.menu-toggle {
+			display: inline-flex;
+		}
+
+		.nav {
+			position: fixed;
+			top: calc(var(--header-h) + env(safe-area-inset-top));
+			left: 0;
+			right: 0;
+			z-index: 39;
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.25rem;
+			padding: 0.6rem 0.75rem 0.9rem;
+			background: hsl(222 47% 9.5%);
+			border-bottom: 1px solid hsl(222 30% 20%);
+			box-shadow: var(--shadow-lg);
+			transform: translateY(-8px);
+			opacity: 0;
+			visibility: hidden;
+			pointer-events: none;
+			transition:
+				transform 0.18s ease,
+				opacity 0.18s ease,
+				visibility 0.18s;
+		}
+
+		.nav.open {
+			transform: none;
+			opacity: 1;
+			visibility: visible;
+			pointer-events: auto;
+		}
+
+		.nav-link {
+			padding: 0.85rem 0.9rem;
+			font-size: 0.97rem;
+		}
+
+		.nav-backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 38;
+			border: none;
+			padding: 0;
+			background: hsl(222 47% 6% / 0.45);
+			backdrop-filter: blur(2px);
+			cursor: default;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.topbar-inner {
+			padding: 0 0.9rem;
+		}
+
+		.content {
+			padding: 1rem 0.85rem 3rem;
+		}
+	}
+
+	@media (max-width: 380px) {
+		.brand-text span {
+			display: none;
+		}
 	}
 </style>

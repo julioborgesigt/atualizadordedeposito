@@ -135,21 +135,35 @@
 	const temAlgoParaSalvar = $derived(previewDocs.some((d) => !d.jaImportado));
 </script>
 
-<h1>Importar Autos de Apreensão e Termos de Restituição</h1>
-<p class="sub">
-	Primeiro escolha se deseja adicionar os itens a uma caixa existente ou criar uma nova caixa. Em seguida, selecione os PDFs do procedimento.
-</p>
+<svelte:head>
+	<title>Importar PDFs — Custódia PCCE</title>
+</svelte:head>
 
-<section class="step-card">
+<div class="page-head">
+	<div>
+		<h1>Importar autos e termos</h1>
+		<p class="sub">
+			Escolha a caixa de destino e, em seguida, selecione os PDFs de Auto de Apresentação e Apreensão ou Termo de Restituição.
+		</p>
+	</div>
+</div>
+
+<section class="panel step-card" aria-labelledby="passo-1">
 	<div class="step-header">
-		<span class="step-num">1</span>
+		<span class="step-num" class:done={passoCaixaValido}>
+			{#if passoCaixaValido}
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+			{:else}
+				1
+			{/if}
+		</span>
 		<div>
-			<h2>A qual Caixa pertencem os itens desta importação?</h2>
-			<p>Escolha se deseja atualizar uma caixa existente no depósito ou abrir uma nova caixa.</p>
+			<h2 id="passo-1">Caixa de destino</h2>
+			<p>Atualize uma caixa existente no depósito ou abra uma nova caixa para esta importação.</p>
 		</div>
 	</div>
 
-	<div class="modo-opcoes">
+	<div class="modo-opcoes" role="radiogroup" aria-label="Caixa de destino">
 		<label class="radio-card" class:selected={modoCaixa === 'EXISTENTE'} class:disabled={caixasExistentes.length === 0}>
 			<input
 				type="radio"
@@ -159,10 +173,10 @@
 				disabled={caixasExistentes.length === 0}
 			/>
 			<div>
-				<strong>Atualizar uma caixa existente</strong>
+				<strong>Caixa existente</strong>
 				<span>
 					{caixasExistentes.length > 0
-						? `Selecionar entre ${caixasExistentes.length} caixa(s) já cadastrada(s)`
+						? `Escolher entre ${caixasExistentes.length} caixa(s) cadastrada(s)`
 						: 'Nenhuma caixa cadastrada ainda'}
 				</span>
 			</div>
@@ -171,16 +185,16 @@
 		<label class="radio-card" class:selected={modoCaixa === 'NOVA'}>
 			<input type="radio" name="modoCaixa" value="NOVA" bind:group={modoCaixa} />
 			<div>
-				<strong>Criar uma nova caixa</strong>
-				<span>Cadastrar nova caixa/local físico para esta apreensão</span>
+				<strong>Nova caixa</strong>
+				<span>Cadastrar novo local físico para esta apreensão</span>
 			</div>
 		</label>
 
 		<label class="radio-card" class:selected={modoCaixa === 'SEM_CAIXA'}>
 			<input type="radio" name="modoCaixa" value="SEM_CAIXA" bind:group={modoCaixa} />
 			<div>
-				<strong>Sem caixa / Apenas Restituição</strong>
-				<span>Não vincular a nenhuma caixa neste momento</span>
+				<strong>Sem caixa</strong>
+				<span>Apenas restituição ou vincular depois</span>
 			</div>
 		</label>
 	</div>
@@ -188,7 +202,7 @@
 	<div class="caixa-fields">
 		{#if modoCaixa === 'EXISTENTE'}
 			<div class="field">
-				<label for="select-caixa-existente">Selecione a caixa existente *</label>
+				<span class="field-label">Caixa existente *</span>
 				<CaixaSelect
 					opcoes={opcoesCaixasExistentes}
 					bind:value={caixaExistenteNome}
@@ -198,7 +212,7 @@
 			</div>
 		{:else if modoCaixa === 'NOVA'}
 			<div class="field">
-				<label for="input-nova-caixa">Nome / Identificação da Nova Caixa *</label>
+				<label class="field-label" for="input-nova-caixa">Nome / identificação da nova caixa *</label>
 				<input
 					id="input-nova-caixa"
 					type="text"
@@ -209,22 +223,17 @@
 		{/if}
 
 		<div class="field">
-			<label for="operacao">Nome da Operação (opcional)</label>
-			<input
-				id="operacao"
-				type="text"
-				bind:value={operacao}
-				placeholder="Ex: Operação Rastro Digital"
-			/>
+			<label class="field-label" for="operacao">Nome da operação <span class="opt">(opcional)</span></label>
+			<input id="operacao" type="text" bind:value={operacao} placeholder="Ex: Operação Rastro Digital" />
 		</div>
 	</div>
 </section>
 
-<section class="step-card" class:locked={!passoCaixaValido}>
+<section class="panel step-card" class:locked={!passoCaixaValido} aria-labelledby="passo-2">
 	<div class="step-header">
 		<span class="step-num">2</span>
 		<div>
-			<h2>Selecionar PDFs do Procedimento</h2>
+			<h2 id="passo-2">PDFs do procedimento</h2>
 			<p>
 				{#if modoCaixa === 'EXISTENTE' && caixaFinal}
 					Os novos bens apreendidos serão adicionados à caixa <strong>"{caixaFinal}"</strong>.
@@ -233,13 +242,13 @@
 				{:else if modoCaixa === 'SEM_CAIXA'}
 					Importação configurada <strong>sem vínculo de caixa</strong>.
 				{:else}
-					Preencha ou selecione a caixa no Passo 1 acima para liberar o upload dos PDFs.
+					Preencha ou selecione a caixa no passo 1 para liberar o envio dos PDFs.
 				{/if}
 			</p>
 		</div>
 	</div>
 
-	<div class="dropzone" class:disabled={!passoCaixaValido}>
+	<div class="dropzone" class:disabled={!passoCaixaValido} class:loading={carregando}>
 		<input
 			id="pdf-input"
 			type="file"
@@ -248,382 +257,523 @@
 			disabled={!passoCaixaValido || carregando}
 			onchange={(e) => processarArquivos((e.currentTarget as HTMLInputElement).files)}
 		/>
-		<label for="pdf-input">
+		<span class="drop-icon" aria-hidden="true">
+			{#if carregando}
+				<span class="spinner"></span>
+			{:else}
+				<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3" /></svg>
+			{/if}
+		</span>
+		<label for="pdf-input" class="btn {passoCaixaValido && !carregando ? 'btn-primary' : 'btn-secondary'} drop-btn">
 			{#if !passoCaixaValido}
-				Defina a caixa no Passo 1 para habilitar o upload
+				Defina a caixa no passo 1
 			{:else if carregando}
 				Lendo PDFs e conciliando itens...
 			{:else}
-				Clique para selecionar os PDFs (múltiplos arquivos)
+				Selecionar PDFs
 			{/if}
 		</label>
+		<span class="drop-hint">Aceita vários arquivos .pdf de uma só vez</span>
 	</div>
 </section>
 
 {#if erro}
-	<div class="alert error">{erro}</div>
+	<div class="alert error" role="alert">{erro}</div>
 {/if}
 
 {#if mensagemSucesso}
-	<div class="alert success">{mensagemSucesso}</div>
+	<div class="alert success" role="status">{mensagemSucesso}</div>
 {/if}
 
 {#if previewDocs.length > 0}
+	<h2 class="preview-title">Pré-visualização <span class="count-pill">{previewDocs.length}</span></h2>
+
 	{#each previewDocs as doc}
-		<article class="doc-card" class:duplicado={doc.jaImportado}>
-			<header>
-				<div>
-					<span class="badge {doc.tipoDocumento === 'APREENSAO' ? 'blue' : 'green'}">
-						{doc.tipoDocumento === 'APREENSAO' ? 'APREENSÃO' : 'RESTITUIÇÃO'}
-					</span>
-					<strong>{doc.tipoProcedimento} {doc.numeroProcedimento}</strong>
-					<span class="muted">• {doc.dataAto ?? 'Sem data'} • {doc.nomeArquivo}</span>
-					{#if doc.tipoDocumento === 'APREENSAO' && caixaFinal}
-						<span class="badge purple">Destino: {caixaFinal}</span>
-					{/if}
+		<article class="panel doc-card" class:duplicado={doc.jaImportado}>
+			<header class="doc-head">
+				<div class="doc-head-main">
+					<div class="doc-badges">
+						<span class="badge {doc.tipoDocumento === 'APREENSAO' ? 'blue' : 'green'}">
+							{doc.tipoDocumento === 'APREENSAO' ? 'APREENSÃO' : 'RESTITUIÇÃO'}
+						</span>
+						{#if doc.tipoDocumento === 'APREENSAO' && caixaFinal}
+							<span class="badge purple">Destino: {caixaFinal}</span>
+						{/if}
+					</div>
+					<strong class="doc-proc">{doc.tipoProcedimento} {doc.numeroProcedimento}</strong>
+					<span class="muted doc-meta">{doc.dataAto ?? 'Sem data'} · {doc.nomeArquivo}</span>
 				</div>
 				{#if doc.jaImportado}
-					<div style="display:flex; align-items:center; gap:0.5rem;">
-						<span class="badge warn">JÁ IMPORTADO (ignorado)</span>
-						<button
-							type="button"
-							style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem; font-weight:600; cursor:pointer;"
-							onclick={() => (doc.jaImportado = false)}
-						>
+					<div class="dup-box">
+						<span class="badge warn">Já importado (ignorado)</span>
+						<button type="button" class="btn btn-secondary btn-sm" onclick={() => (doc.jaImportado = false)}>
 							Reimportar mesmo assim
 						</button>
 					</div>
 				{/if}
 			</header>
 
-			<p class="partes">
-				<strong>Delegado:</strong> {doc.delegado ?? '-'} |
-				<strong>{doc.tipoDocumento === 'APREENSAO' ? 'Apresentador' : 'Recebedor'}:</strong>
-				{doc.parteNome ?? '-'} ({doc.parteCpf ?? '-'})
-			</p>
+			<dl class="partes">
+				<div>
+					<dt>Delegado</dt>
+					<dd>{doc.delegado ?? '—'}</dd>
+				</div>
+				<div>
+					<dt>{doc.tipoDocumento === 'APREENSAO' ? 'Apresentador' : 'Recebedor'}</dt>
+					<dd>{doc.parteNome ?? '—'} <span class="muted">({doc.parteCpf ?? '—'})</span></dd>
+				</div>
+			</dl>
 
 			{#if !doc.jaImportado && doc.tipoDocumento === 'APREENSAO'}
-				<table>
-					<thead>
-						<tr>
-							<th style="width:40px">Ok</th>
-							<th>Categoria</th>
-							<th>Descrição extraída</th>
-							<th>Qtd</th>
-							<th>Previsão pós-lote</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each doc.itensApreensao as entry}
+				<div class="table-wrap cards">
+					<table class="table prev-table">
+						<thead>
 							<tr>
-								<td><input type="checkbox" bind:checked={entry.incluir} /></td>
-								<td>{entry.item.categoria}</td>
-								<td>{entry.item.descricaoOriginal}</td>
-								<td>{entry.item.quantidade} {entry.item.unidade}</td>
-								<td>
-									{#if entry.seraRestituidoNoLote}
-										<span class="badge green">Restituído neste lote</span>
-									{:else}
-										<span class="badge amber">Em depósito</span>
-									{/if}
-								</td>
+								<th style="width:48px">Incluir</th>
+								<th>Categoria</th>
+								<th>Descrição extraída</th>
+								<th>Qtd</th>
+								<th>Previsão</th>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{#each doc.itensApreensao as entry}
+								<tr class:excluido={!entry.incluir}>
+									<td class="p-check">
+										<input type="checkbox" bind:checked={entry.incluir} aria-label="Incluir item" />
+									</td>
+									<td class="p-cat"><span class="cat">{entry.item.categoria}</span></td>
+									<td class="p-desc">{entry.item.descricaoOriginal}</td>
+									<td class="p-qtd" data-label="Qtd">{entry.item.quantidade} {entry.item.unidade}</td>
+									<td class="p-prev">
+										{#if entry.seraRestituidoNoLote}
+											<span class="badge green">Restituído neste lote</span>
+										{:else}
+											<span class="badge amber">Em depósito</span>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 			{/if}
 
 			{#if !doc.jaImportado && doc.tipoDocumento === 'RESTITUICAO'}
-				<table>
-					<thead>
-						<tr>
-							<th>Item no Termo de Restituição</th>
-							<th>Match automático</th>
-							<th>Vincular ao bem em depósito</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each doc.itensRestituicao as m}
+				<div class="table-wrap cards">
+					<table class="table rest-table">
+						<thead>
 							<tr>
-								<td>
-									<div>{m.item.descricaoOriginal}</div>
-									<small class="muted">Qtd: {m.item.quantidade} {m.item.unidade}</small>
-								</td>
-								<td>
-									<span class="badge {m.camada === 'NAO_ENCONTRADO' ? 'warn' : 'green'}">
-										{m.camada} {m.confianca > 0 ? `(${m.confianca}%)` : ''}
-									</span>
-								</td>
-								<td>
-									<select bind:value={m.alvoKey}>
-										<option value="__CRIAR_RESTITUIDO__">+ Cadastrar já como Restituído</option>
-										<option value="__IGNORAR__">-- Ignorar este item --</option>
-										{#each doc.candidatosDisponiveis as cand}
-											<option value={cand.key}>
-												[{cand.origem === 'LOTE' ? 'Neste lote' : 'No depósito'}] {cand.label}
-											</option>
-										{/each}
-									</select>
-								</td>
+								<th>Item no termo de restituição</th>
+								<th>Match automático</th>
+								<th>Vincular ao bem em depósito</th>
 							</tr>
-						{/each}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{#each doc.itensRestituicao as m}
+								<tr>
+									<td class="r-item">
+										<div class="desc">{m.item.descricaoOriginal}</div>
+										<small class="muted">Qtd: {m.item.quantidade} {m.item.unidade}</small>
+									</td>
+									<td class="r-match" data-label="Match automático">
+										<span class="badge {m.camada === 'NAO_ENCONTRADO' ? 'warn' : 'green'}">
+											{m.camada} {m.confianca > 0 ? `(${m.confianca}%)` : ''}
+										</span>
+									</td>
+									<td class="r-alvo" data-label="Vincular a">
+										<select bind:value={m.alvoKey} aria-label="Bem a vincular">
+											<option value="__CRIAR_RESTITUIDO__">+ Cadastrar já como Restituído</option>
+											<option value="__IGNORAR__">-- Ignorar este item --</option>
+											{#each doc.candidatosDisponiveis as cand}
+												<option value={cand.key}>
+													[{cand.origem === 'LOTE' ? 'Neste lote' : 'No depósito'}] {cand.label}
+												</option>
+											{/each}
+										</select>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 			{/if}
 		</article>
 	{/each}
 
 	<div class="actions">
 		<button
-			class="btn-primary"
+			class="btn btn-success btn-confirmar"
 			disabled={!temAlgoParaSalvar || !passoCaixaValido || salvando}
 			onclick={confirmarImportacao}
 		>
+			<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
 			{salvando
 				? 'Gravando no Cloudflare D1...'
 				: caixaFinal
-					? `Confirmar e Salvar na Caixa "${caixaFinal}"`
-					: 'Confirmar e Salvar no Banco'}
+					? `Confirmar e salvar na caixa "${caixaFinal}"`
+					: 'Confirmar e salvar no banco'}
 		</button>
 	</div>
 {/if}
 
 <style>
-	h1 {
-		margin: 0 0 0.25rem;
-		font-size: 1.45rem;
-	}
-	.sub {
-		margin: 0 0 1.2rem;
-		color: #475569;
-		font-size: 0.95rem;
-	}
 	.step-card {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 10px;
-		padding: 1.2rem;
-		margin-bottom: 1.1rem;
+		transition: opacity 0.2s;
 	}
 	.step-card.locked {
-		opacity: 0.7;
+		opacity: 0.6;
 	}
 	.step-header {
 		display: flex;
 		align-items: flex-start;
 		gap: 0.85rem;
-		margin-bottom: 1rem;
+		margin-bottom: 1.1rem;
 	}
 	.step-num {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 28px;
-		height: 28px;
-		border-radius: 999px;
-		background: #2563eb;
+		width: 30px;
+		height: 30px;
+		flex-shrink: 0;
+		border-radius: var(--radius-pill);
+		background: var(--primary);
 		color: #fff;
 		font-weight: 700;
-		font-size: 0.9rem;
-		flex-shrink: 0;
+		font-size: 0.88rem;
+		box-shadow: 0 2px 6px hsl(221 76% 48% / 0.3);
+		transition: background 0.2s;
+	}
+	.step-num.done {
+		background: var(--success);
+		box-shadow: 0 2px 6px hsl(142 64% 32% / 0.3);
 	}
 	.step-header h2 {
-		margin: 0 0 0.2rem;
-		font-size: 1.08rem;
+		margin: 0.1rem 0 0.2rem;
+		font-size: 1.05rem;
+		font-weight: 700;
 	}
 	.step-header p {
 		margin: 0;
-		font-size: 0.88rem;
-		color: #64748b;
+		font-size: 0.87rem;
+		color: var(--text-2);
 	}
+
 	.modo-opcoes {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 0.75rem;
-		margin-bottom: 1rem;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.65rem;
+		margin-bottom: 1.1rem;
 	}
 	.radio-card {
 		display: flex;
 		align-items: flex-start;
 		gap: 0.65rem;
-		padding: 0.85rem;
-		border: 2px solid #e2e8f0;
-		border-radius: 8px;
+		padding: 0.85rem 0.9rem;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius);
+		background: var(--surface);
 		cursor: pointer;
-		background: #f8fafc;
-		transition: border-color 0.15s, background 0.15s;
+		transition:
+			border-color 0.15s,
+			background 0.15s,
+			box-shadow 0.15s;
+	}
+	.radio-card:hover:not(.disabled) {
+		border-color: hsl(221 60% 70%);
 	}
 	.radio-card.selected {
-		border-color: #2563eb;
-		background: #eff6ff;
+		border-color: var(--primary);
+		background: var(--primary-soft);
+		box-shadow: 0 0 0 1px var(--primary);
 	}
 	.radio-card.disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
 	.radio-card input {
-		margin-top: 0.2rem;
+		margin-top: 0.15rem;
+		flex-shrink: 0;
 	}
 	.radio-card strong {
 		display: block;
-		font-size: 0.92rem;
-		margin-bottom: 0.15rem;
+		font-size: 0.9rem;
+		margin-bottom: 0.1rem;
 	}
 	.radio-card span {
 		display: block;
 		font-size: 0.78rem;
-		color: #64748b;
+		color: var(--text-2);
 	}
+
 	.caixa-fields {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-		gap: 1rem;
+		gap: 0.9rem;
 	}
-	.field label {
+	.field-label {
 		display: block;
-		font-size: 0.85rem;
+		font-size: 0.82rem;
 		font-weight: 600;
 		margin-bottom: 0.35rem;
+		color: var(--text);
+	}
+	.opt {
+		font-weight: 400;
+		color: var(--text-3);
 	}
 	.field input {
 		width: 100%;
-		max-width: none;
-		box-sizing: border-box;
-		padding: 0.55rem 0.7rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		font-size: 0.9rem;
 	}
+
 	.dropzone {
-		border: 2px dashed #94a3b8;
-		border-radius: 10px;
-		background: #f8fafc;
-		padding: 1.6rem;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 1.8rem 1rem;
+		border: 1.5px dashed var(--border-strong);
+		border-radius: var(--radius-lg);
+		background:
+			radial-gradient(circle at 50% 0%, var(--primary-soft), transparent 70%),
+			var(--surface-2);
 		text-align: center;
+		transition:
+			border-color 0.15s,
+			background 0.15s;
+	}
+	.dropzone:not(.disabled):hover {
+		border-color: var(--primary);
 	}
 	.dropzone input {
 		display: none;
 	}
-	.dropzone label {
-		cursor: pointer;
-		display: inline-block;
-		padding: 0.65rem 1.2rem;
-		background: #2563eb;
-		color: #fff;
-		border-radius: 6px;
-		font-weight: 600;
+	.drop-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 52px;
+		height: 52px;
+		border-radius: 14px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		box-shadow: var(--shadow-sm);
+		color: var(--primary);
 	}
-	.dropzone.disabled label {
-		background: #94a3b8;
+	.dropzone.disabled .drop-icon {
+		color: var(--text-3);
+	}
+	.drop-btn {
+		cursor: pointer;
+	}
+	.dropzone.disabled .drop-btn,
+	.dropzone.loading .drop-btn {
 		cursor: not-allowed;
 	}
-	.doc-card {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 8px;
-		padding: 1rem;
-		margin-bottom: 1rem;
+	.drop-hint {
+		font-size: 0.78rem;
+		color: var(--text-3);
+	}
+	.spinner {
+		width: 22px;
+		height: 22px;
+		border: 2.5px solid var(--primary-soft-2);
+		border-top-color: var(--primary);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.preview-title {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 1.6rem 0 0.8rem;
+		font-size: 1.1rem;
+		font-weight: 700;
 	}
 	.doc-card.duplicado {
-		opacity: 0.65;
+		opacity: 0.7;
 	}
-	.doc-card header {
+	.doc-head {
 		display: flex;
 		justify-content: space-between;
+		align-items: flex-start;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	.doc-head-main {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+	.doc-badges {
+		display: flex;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.doc-proc {
+		font-size: 1rem;
+		font-weight: 700;
+	}
+	.doc-meta {
+		overflow-wrap: anywhere;
+	}
+	.dup-box {
+		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		flex-wrap: wrap;
 	}
+
 	.partes {
-		font-size: 0.85rem;
-		color: #475569;
-		margin: 0.5rem 0 0.9rem;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.75rem;
+		margin: 0.9rem 0 1rem;
+		padding: 0.7rem 0.85rem;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
 	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.86rem;
+	.partes dt {
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--text-3);
 	}
-	th,
-	td {
-		text-align: left;
-		padding: 0.5rem;
-		border-top: 1px solid #e2e8f0;
+	.partes dd {
+		margin: 0.1rem 0 0;
+		font-size: 0.87rem;
+	}
+
+	.prev-table td,
+	.rest-table td {
 		vertical-align: top;
 	}
-	th {
-		background: #f8fafc;
-		font-weight: 600;
+	.prev-table tr.excluido td {
+		opacity: 0.5;
 	}
-	select {
-		width: 100%;
-		max-width: 360px;
-		padding: 0.4rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-	}
-	.badge {
-		display: inline-block;
-		padding: 0.18rem 0.5rem;
-		border-radius: 999px;
-		font-size: 0.75rem;
+	.cat {
+		font-size: 0.7rem;
 		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--text-2);
 	}
-	.badge.blue {
-		background: #dbeafe;
-		color: #1d4ed8;
+	.p-desc,
+	.desc {
+		overflow-wrap: anywhere;
 	}
-	.badge.green {
-		background: #dcfce7;
-		color: #15803d;
+	.p-qtd {
+		white-space: nowrap;
 	}
-	.badge.amber {
-		background: #fef3c7;
-		color: #b45309;
+	.r-alvo select {
+		width: 100%;
+		max-width: 380px;
 	}
-	.badge.purple {
-		background: #f3e8ff;
-		color: #6b21a8;
-	}
-	.badge.warn {
-		background: #fee2e2;
-		color: #b91c1c;
-	}
-	.muted {
-		color: #64748b;
-		font-size: 0.82rem;
-	}
-	.alert {
-		padding: 0.8rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-weight: 500;
-	}
-	.alert.error {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-	.alert.success {
-		background: #dcfce7;
-		color: #166534;
-	}
+
 	.actions {
 		display: flex;
 		justify-content: flex-end;
 		margin-top: 1rem;
 	}
-	.btn-primary {
-		background: #16a34a;
-		color: #fff;
-		border: none;
-		padding: 0.75rem 1.4rem;
-		border-radius: 8px;
-		font-size: 0.95rem;
-		font-weight: 600;
-		cursor: pointer;
+	.btn-confirmar {
+		min-height: 46px;
+		padding: 0.7rem 1.4rem;
+		font-size: 0.93rem;
+		white-space: normal;
+		text-align: center;
 	}
-	.btn-primary:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
+
+	@media (max-width: 860px) {
+		.modo-opcoes {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.step-header {
+			gap: 0.7rem;
+		}
+		.radio-card {
+			padding: 0.9rem;
+		}
+		.dropzone {
+			padding: 1.4rem 0.9rem;
+		}
+		.drop-btn {
+			width: 100%;
+			white-space: normal;
+		}
+		.dup-box,
+		.dup-box .btn {
+			width: 100%;
+		}
+		.partes {
+			flex-direction: column;
+		}
+
+		/* Itens de apreensão em cards */
+		.prev-table tr {
+			display: grid !important;
+			grid-template-columns: auto 1fr auto;
+			grid-template-areas:
+				'check cat qtd'
+				'desc desc desc'
+				'prev prev prev';
+			column-gap: 0.6rem;
+			row-gap: 0.3rem;
+		}
+		.prev-table .p-check {
+			grid-area: check;
+		}
+		.prev-table .p-cat {
+			grid-area: cat;
+			align-self: center;
+		}
+		.prev-table .p-qtd {
+			grid-area: qtd;
+			width: auto;
+			text-align: right;
+		}
+		.prev-table .p-qtd::before {
+			display: none !important;
+		}
+		.prev-table .p-desc {
+			grid-area: desc;
+		}
+		.prev-table .p-prev {
+			grid-area: prev;
+		}
+		.prev-table td {
+			width: auto !important;
+		}
+
+		.r-alvo select {
+			max-width: none;
+		}
+
+		.actions {
+			position: sticky;
+			bottom: 0;
+			z-index: 20;
+			margin: 1rem -0.85rem -3rem;
+			padding: 0.75rem 0.85rem calc(0.75rem + env(safe-area-inset-bottom));
+			background: hsl(0 0% 100% / 0.92);
+			backdrop-filter: blur(8px);
+			border-top: 1px solid var(--border);
+		}
+		.btn-confirmar {
+			width: 100%;
+		}
 	}
 </style>
