@@ -9,50 +9,73 @@ interface CommitPayload {
 	documentos: PreviewDocumento[];
 }
 
+function mapearTipoFallback(tipo: string): 'BO' | 'IP' | 'TCO' | 'BOC' | 'OUTRO' {
+	const t = tipo
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toUpperCase()
+		.trim();
+	if (t === 'BO' || t.includes('BOLETIM')) return 'BO';
+	if (t === 'IP' || t.includes('INQUERITO')) return 'IP';
+	if (t === 'TCO' || t.includes('TERMO CIRCUNSTANCIADO')) return 'TCO';
+	if (t === 'BOC' || t.includes('ATO INFRACIONAL') || t === 'AI') return 'BOC';
+	return 'OUTRO';
+}
+
 async function obterOuCriarProcedimento(
 	db: D1Database,
 	tipo: TipoProcedimento,
 	numero: string,
 	operacao: string | null
 ): Promise<number> {
-	try {
-		await db
-			.prepare(
-				`INSERT OR IGNORE INTO procedimentos (tipo, numero_normalizado, operacao)
-				 VALUES (?, ?, ?)`
-			)
-			.bind(tipo, numero, operacao || null)
-			.run();
-	} catch (err: any) {
-		if (String(err).includes('CHECK constraint failed')) {
-			const fallbackTipo = tipo === 'INQUÉRITO' || tipo === 'INQUERITO' ? 'IP' : 'OUTRO';
-			await db
-				.prepare(
-					`INSERT OR IGNORE INTO procedimentos (tipo, numero_normalizado, operacao)
-					 VALUES (?, ?, ?)`
-				)
-				.bind(fallbackTipo, numero, operacao || null)
-				.run();
-		} else {
-			throw err;
-		}
-	}
-
-	if (operacao) {
-		await db
-			.prepare(
-				`UPDATE procedimentos SET operacao = COALESCE(operacao, ?) WHERE numero_normalizado = ?`
-			)
-			.bind(operacao, numero)
-			.run();
-	}
-
-	const row = await db
+	let row = await db
 		.prepare('SELECT id FROM procedimentos WHERE numero_normalizado = ?')
 		.bind(numero)
 		.first<{ id: number }>();
 
-	return row!.id;
+	if (!row) {
+		try {
+			await db
+				.prepare(
+					`INSERT INTO procedimentos (tipo, numero_normalizado, operacao)
+					 VALUES (?, ?, ?)`
+				)
+				.bind(tipo, numero, operacao || null)
+				.run();
+		} catch (err: unknown) {
+			const msg = String(err);
+			if (msg.includes('CHECK constraint failed')) {
+				const fallbackTipo = mapearTipoFallback(tipo);
+				await db
+					.prepare(
+						`INSERT OR IGNORE INTO procedimentos (tipo, numero_normalizado, operacao)
+						 VALUES (?, ?, ?)`
+					)
+					.bind(fallbackTipo, numero, operacao || null)
+					.run();
+			} else if (!msg.includes('UNIQUE constraint failed')) {
+				throw err;
+			}
+		}
+
+		row = await db
+			.prepare('SELECT id FROM procedimentos WHERE numero_normalizado = ?')
+			.bind(numero)
+			.first<{ id: number }>();
+	}
+
+	if (!row) {
+		throw error(500, `Não foi possível criar ou localizar o procedimento ${tipo} ${numero}.`);
+	}
+
+	if (operacao) {
+		await db
+			.prepare(`UPDATE procedimentos SET operacao = COALESCE(operacao, ?) WHERE id = ?`)
+			.bind(operacao, row.id)
+			.run();
+	}
+
+	return row.id;
 }
 
 export const POST: RequestHandler = async ({ request, platform }) => {
