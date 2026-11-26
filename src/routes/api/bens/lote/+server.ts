@@ -4,6 +4,7 @@ import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
 const STATUS_VALIDOS = new Set([
 	'EM_DEPOSITO',
+	'DEPOSITO_DP_IGT',
 	'RESTITUIDO_PARCIAL',
 	'RESTITUIDO',
 	'PERICIA',

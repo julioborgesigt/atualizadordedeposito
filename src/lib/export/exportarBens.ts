@@ -10,6 +10,7 @@ export interface ContextoExportacao {
 
 const MAPA_STATUS: Record<string, string> = {
 	EM_DEPOSITO: 'Em depósito',
+	DEPOSITO_DP_IGT: 'Depósito DP IGT',
 	RESTITUIDO: 'Restituído',
 	RESTITUIDO_PARCIAL: 'Restituído parcial',
 	PERICIA: 'Perícia (PEFOCE)',

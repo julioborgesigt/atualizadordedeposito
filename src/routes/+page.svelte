@@ -8,6 +8,7 @@
 
 	const STATUS_OPCOES = [
 		{ value: 'EM_DEPOSITO', label: 'Em depósito' },
+		{ value: 'DEPOSITO_DP_IGT', label: 'Depósito DP IGT' },
 		{ value: 'RESTITUIDO', label: 'Restituído' },
 		{ value: 'RESTITUIDO_PARCIAL', label: 'Restituído parcial' },
 		{ value: 'PERICIA', label: 'Perícia (PEFOCE)' },
@@ -59,7 +60,11 @@
 			}
 			grupo.itens.push(bem);
 			grupo.totalItens += 1;
-			if (bem.status === 'EM_DEPOSITO' || bem.status === 'RESTITUIDO_PARCIAL') {
+			if (
+				bem.status === 'EM_DEPOSITO' ||
+				bem.status === 'DEPOSITO_DP_IGT' ||
+				bem.status === 'RESTITUIDO_PARCIAL'
+			) {
 				grupo.emDeposito += 1;
 			} else if (bem.status === 'RESTITUIDO') {
 				grupo.restituidos += 1;
@@ -1322,7 +1327,8 @@
 		background-color: var(--surface-3);
 		color: var(--text-2);
 	}
-	.status-select.em_deposito {
+	.status-select.em_deposito,
+	.status-select.deposito_dp_igt {
 		background-color: var(--warning-soft);
 		color: var(--warning);
 	}

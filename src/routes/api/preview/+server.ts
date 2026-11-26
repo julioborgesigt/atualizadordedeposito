@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				        b.identificador_unico, b.qtd_disponivel
 				 FROM bens b
 				 JOIN procedimentos p ON p.id = b.procedimento_id
-				 WHERE b.status IN ('EM_DEPOSITO', 'RESTITUIDO_PARCIAL')
+				 WHERE b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'RESTITUIDO_PARCIAL')
 				   AND (
 				     p.numero_normalizado = ?
 				     OR p.procedimento_principal_id IN (SELECT id FROM procedimentos WHERE numero_normalizado = ?)

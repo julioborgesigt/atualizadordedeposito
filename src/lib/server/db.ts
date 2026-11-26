@@ -46,6 +46,7 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 			status TEXT NOT NULL DEFAULT 'EM_DEPOSITO' CHECK (
 				status IN (
 					'EM_DEPOSITO',
+					'DEPOSITO_DP_IGT',
 					'RESTITUIDO_PARCIAL',
 					'RESTITUIDO',
 					'PERICIA',
@@ -77,6 +78,64 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 		db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_desc_norm ON bens(descricao_normalizada)`),
 		db.prepare(`CREATE INDEX IF NOT EXISTS idx_proc_principal ON procedimentos(procedimento_principal_id)`)
 	]);
+
+	// Migração transparente caso a tabela bens em produção tenha sido criada com o CHECK constraint antigo
+	try {
+		const row = await db
+			.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bens'`)
+			.first<{ sql: string }>();
+
+		if (row?.sql && !row.sql.includes('DEPOSITO_DP_IGT')) {
+			await db.batch([
+				db.prepare(`PRAGMA foreign_keys = OFF;`),
+				db.prepare(`ALTER TABLE bens RENAME TO bens_old;`),
+				db.prepare(`CREATE TABLE bens (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					procedimento_id INTEGER NOT NULL REFERENCES procedimentos(id) ON DELETE CASCADE,
+					caixa_id INTEGER REFERENCES caixas(id) ON DELETE SET NULL,
+					categoria TEXT NOT NULL DEFAULT 'DIVERSO',
+					descricao_original TEXT NOT NULL,
+					descricao_normalizada TEXT NOT NULL,
+					tipo_identificador TEXT CHECK (tipo_identificador IN ('IMEI', 'PLACA', 'CARTAO', 'CNPJ', 'SERIE')),
+					identificador_unico TEXT,
+					qtd_total REAL NOT NULL DEFAULT 1,
+					qtd_disponivel REAL NOT NULL DEFAULT 1,
+					unidade TEXT NOT NULL DEFAULT 'UN',
+					status TEXT NOT NULL DEFAULT 'EM_DEPOSITO' CHECK (
+						status IN (
+							'EM_DEPOSITO',
+							'DEPOSITO_DP_IGT',
+							'RESTITUIDO_PARCIAL',
+							'RESTITUIDO',
+							'PERICIA',
+							'JUDICIARIO',
+							'DESTRUIDO'
+						)
+					),
+					observacoes TEXT,
+					criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+					atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+				);`),
+				db.prepare(`INSERT INTO bens (
+					id, procedimento_id, caixa_id, categoria, descricao_original, descricao_normalizada,
+					tipo_identificador, identificador_unico, qtd_total, qtd_disponivel, unidade,
+					status, observacoes, criado_em, atualizado_em
+				) SELECT
+					id, procedimento_id, caixa_id, categoria, descricao_original, descricao_normalizada,
+					tipo_identificador, identificador_unico, qtd_total, qtd_disponivel, unidade,
+					status, observacoes, criado_em, atualizado_em
+				FROM bens_old;`),
+				db.prepare(`DROP TABLE bens_old;`),
+				db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_proc ON bens(procedimento_id);`),
+				db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_status ON bens(status);`),
+				db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_id_unico ON bens(identificador_unico);`),
+				db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_desc_norm ON bens(descricao_normalizada);`),
+				db.prepare(`PRAGMA foreign_keys = ON;`)
+			]);
+		}
+	} catch (e) {
+		console.error('Aviso ao verificar/migrar schema de bens:', e);
+	}
 
 	inicializado = true;
 }
