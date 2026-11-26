@@ -137,6 +137,43 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 		console.error('Aviso ao verificar/migrar schema de bens:', e);
 	}
 
+	// Correção caso a tabela movimentacoes tenha ficado com foreign key apontando para bens_old
+	try {
+		const rowMov = await db
+			.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'movimentacoes'`)
+			.first<{ sql: string }>();
+
+		if (rowMov?.sql && rowMov.sql.includes('bens_old')) {
+			await db.batch([
+				db.prepare(`PRAGMA foreign_keys = OFF;`),
+				db.prepare(`ALTER TABLE movimentacoes RENAME TO movimentacoes_old;`),
+				db.prepare(`CREATE TABLE movimentacoes (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					bem_id INTEGER NOT NULL REFERENCES bens(id) ON DELETE CASCADE,
+					documento_id INTEGER REFERENCES documentos(id) ON DELETE SET NULL,
+					tipo_evento TEXT NOT NULL CHECK (
+						tipo_evento IN ('APREENSAO', 'RESTITUICAO', 'PERICIA', 'JUDICIARIO', 'DESTRUICAO', 'AJUSTE_MANUAL')
+					),
+					qtd_movimentada REAL NOT NULL DEFAULT 1,
+					data_evento TEXT,
+					parte_nome TEXT,
+					parte_cpf TEXT,
+					observacoes TEXT,
+					criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+				);`),
+				db.prepare(`INSERT INTO movimentacoes (
+					id, bem_id, documento_id, tipo_evento, qtd_movimentada, data_evento, parte_nome, parte_cpf, observacoes, criado_em
+				) SELECT
+					id, bem_id, documento_id, tipo_evento, qtd_movimentada, data_evento, parte_nome, parte_cpf, observacoes, criado_em
+				FROM movimentacoes_old;`),
+				db.prepare(`DROP TABLE movimentacoes_old;`),
+				db.prepare(`PRAGMA foreign_keys = ON;`)
+			]);
+		}
+	} catch (e) {
+		console.error('Aviso ao verificar/migrar schema de movimentacoes:', e);
+	}
+
 	inicializado = true;
 }
 
@@ -145,31 +182,35 @@ export async function ensureSchema(db: D1Database): Promise<void> {
  * e procedimentos que ficaram sem bens após exclusões.
  */
 export async function limparResquiciosOrfaos(db: D1Database): Promise<void> {
-	await db.batch([
-		// 1. Remove movimentações cujo bem já foi excluído
-		db.prepare(`
-			DELETE FROM movimentacoes
-			WHERE bem_id NOT IN (SELECT id FROM bens)
-		`),
-		// 2. Remove documentos (APREENSAO ou RESTITUICAO) que não têm mais movimentação ligada a um bem vivo
-		//    ou cujo procedimento não possui mais nenhum bem cadastrado
-		db.prepare(`
-			DELETE FROM documentos
-			WHERE id NOT IN (
-				SELECT DISTINCT m.documento_id
-				FROM movimentacoes m
-				JOIN bens b ON b.id = m.bem_id
-				WHERE m.documento_id IS NOT NULL
-			)
-			OR procedimento_id NOT IN (
-				SELECT DISTINCT procedimento_id FROM bens
-			)
-		`),
-		// 3. Remove procedimentos órfãos (sem bens e sem documentos)
-		db.prepare(`
-			DELETE FROM procedimentos
-			WHERE id NOT IN (SELECT DISTINCT procedimento_id FROM bens)
-			  AND id NOT IN (SELECT DISTINCT procedimento_id FROM documentos)
-		`)
-	]);
+	try {
+		await db.batch([
+			// 1. Remove movimentações cujo bem já foi excluído
+			db.prepare(`
+				DELETE FROM movimentacoes
+				WHERE bem_id NOT IN (SELECT id FROM bens)
+			`),
+			// 2. Remove documentos (APREENSAO ou RESTITUICAO) que não têm mais movimentação ligada a um bem vivo
+			//    ou cujo procedimento não possui mais nenhum bem cadastrado
+			db.prepare(`
+				DELETE FROM documentos
+				WHERE id NOT IN (
+					SELECT DISTINCT m.documento_id
+					FROM movimentacoes m
+					JOIN bens b ON b.id = m.bem_id
+					WHERE m.documento_id IS NOT NULL
+				)
+				OR procedimento_id NOT IN (
+					SELECT DISTINCT procedimento_id FROM bens
+				)
+			`),
+			// 3. Remove procedimentos órfãos (sem bens e sem documentos)
+			db.prepare(`
+				DELETE FROM procedimentos
+				WHERE id NOT IN (SELECT DISTINCT procedimento_id FROM bens)
+				  AND id NOT IN (SELECT DISTINCT procedimento_id FROM documentos)
+			`)
+		]);
+	} catch (e) {
+		console.error('Aviso ao limpar resquícios órfãos:', e);
+	}
 }
