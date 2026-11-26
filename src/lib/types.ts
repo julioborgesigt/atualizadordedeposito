@@ -5,6 +5,7 @@ export type TipoIdentificador = 'IMEI' | 'PLACA' | 'CARTAO' | 'CNPJ' | 'SERIE';
 export type StatusBem =
 	| 'EM_DEPOSITO'
 	| 'DEPOSITO_DP_IGT'
+	| 'EM_EXTRACAO'
 	| 'RESTITUIDO_PARCIAL'
 	| 'RESTITUIDO'
 	| 'PERICIA'

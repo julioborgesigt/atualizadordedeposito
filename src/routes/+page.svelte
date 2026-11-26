@@ -9,6 +9,7 @@
 	const STATUS_OPCOES = [
 		{ value: 'EM_DEPOSITO', label: 'Em depósito' },
 		{ value: 'DEPOSITO_DP_IGT', label: 'Depósito DP IGT' },
+		{ value: 'EM_EXTRACAO', label: 'Em Extração' },
 		{ value: 'RESTITUIDO', label: 'Restituído' },
 		{ value: 'RESTITUIDO_PARCIAL', label: 'Restituído parcial' },
 		{ value: 'PERICIA', label: 'Perícia (PEFOCE)' },
@@ -63,6 +64,7 @@
 			if (
 				bem.status === 'EM_DEPOSITO' ||
 				bem.status === 'DEPOSITO_DP_IGT' ||
+				bem.status === 'EM_EXTRACAO' ||
 				bem.status === 'RESTITUIDO_PARCIAL'
 			) {
 				grupo.emDeposito += 1;
@@ -1343,7 +1345,8 @@
 		background-color: var(--success-soft);
 		color: var(--success);
 	}
-	.status-select.restituido_parcial {
+	.status-select.restituido_parcial,
+	.status-select.em_extracao {
 		background-color: var(--info-soft);
 		color: var(--info);
 	}

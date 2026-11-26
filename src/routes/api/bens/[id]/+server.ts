@@ -5,6 +5,7 @@ import { ensureSchema } from '$lib/server/db';
 const STATUS_VALIDOS = new Set([
 	'EM_DEPOSITO',
 	'DEPOSITO_DP_IGT',
+	'EM_EXTRACAO',
 	'RESTITUIDO_PARCIAL',
 	'RESTITUIDO',
 	'PERICIA',

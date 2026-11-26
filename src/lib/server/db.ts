@@ -47,6 +47,7 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 				status IN (
 					'EM_DEPOSITO',
 					'DEPOSITO_DP_IGT',
+					'EM_EXTRACAO',
 					'RESTITUIDO_PARCIAL',
 					'RESTITUIDO',
 					'PERICIA',
@@ -85,7 +86,7 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 			.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bens'`)
 			.first<{ sql: string }>();
 
-		if (row?.sql && !row.sql.includes('DEPOSITO_DP_IGT')) {
+		if (row?.sql && (!row.sql.includes('DEPOSITO_DP_IGT') || !row.sql.includes('EM_EXTRACAO'))) {
 			await db.batch([
 				db.prepare(`PRAGMA foreign_keys = OFF;`),
 				db.prepare(`ALTER TABLE bens RENAME TO bens_old;`),
@@ -105,6 +106,7 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 						status IN (
 							'EM_DEPOSITO',
 							'DEPOSITO_DP_IGT',
+							'EM_EXTRACAO',
 							'RESTITUIDO_PARCIAL',
 							'RESTITUIDO',
 							'PERICIA',
