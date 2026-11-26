@@ -1,7 +1,4 @@
-import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 export async function calcularSha256(buffer: ArrayBuffer): Promise<string> {
 	const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -11,6 +8,9 @@ export async function calcularSha256(buffer: ArrayBuffer): Promise<string> {
 }
 
 export async function extrairTextoPdf(file: File): Promise<{ texto: string; hashSha256: string }> {
+	const pdfjsLib = await import('pdfjs-dist');
+	pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+
 	const buffer = await file.arrayBuffer();
 	const hashSha256 = await calcularSha256(buffer);
 
