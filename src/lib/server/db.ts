@@ -176,34 +176,6 @@ export async function ensureSchema(db: D1Database): Promise<void> {
 		console.error('Aviso ao verificar/migrar schema de movimentacoes:', e);
 	}
 
-	// Migração transparente para permitir qualquer tipo de procedimento (removendo CHECK constraint antigo caso exista)
-	try {
-		const rowProc = await db
-			.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'procedimentos'`)
-			.first<{ sql: string }>();
-
-		if (rowProc?.sql && rowProc.sql.includes('CHECK')) {
-			await db.batch([
-				db.prepare(`PRAGMA foreign_keys = OFF;`),
-				db.prepare(`CREATE TABLE new_procedimentos (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					tipo TEXT NOT NULL,
-					numero_normalizado TEXT NOT NULL UNIQUE,
-					procedimento_principal_id INTEGER REFERENCES procedimentos(id) ON DELETE SET NULL,
-					operacao TEXT,
-					criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-				);`),
-				db.prepare(`INSERT INTO new_procedimentos SELECT * FROM procedimentos;`),
-				db.prepare(`DROP TABLE procedimentos;`),
-				db.prepare(`ALTER TABLE new_procedimentos RENAME TO procedimentos;`),
-				db.prepare(`CREATE INDEX IF NOT EXISTS idx_proc_principal ON procedimentos(procedimento_principal_id);`),
-				db.prepare(`PRAGMA foreign_keys = ON;`)
-			]);
-		}
-	} catch (e) {
-		console.error('Aviso ao verificar/migrar schema de procedimentos:', e);
-	}
-
 	inicializado = true;
 }
 

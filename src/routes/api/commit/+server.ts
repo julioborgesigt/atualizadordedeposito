@@ -15,13 +15,28 @@ async function obterOuCriarProcedimento(
 	numero: string,
 	operacao: string | null
 ): Promise<number> {
-	await db
-		.prepare(
-			`INSERT OR IGNORE INTO procedimentos (tipo, numero_normalizado, operacao)
-			 VALUES (?, ?, ?)`
-		)
-		.bind(tipo, numero, operacao || null)
-		.run();
+	try {
+		await db
+			.prepare(
+				`INSERT OR IGNORE INTO procedimentos (tipo, numero_normalizado, operacao)
+				 VALUES (?, ?, ?)`
+			)
+			.bind(tipo, numero, operacao || null)
+			.run();
+	} catch (err: any) {
+		if (String(err).includes('CHECK constraint failed')) {
+			const fallbackTipo = tipo === 'INQUÉRITO' || tipo === 'INQUERITO' ? 'IP' : 'OUTRO';
+			await db
+				.prepare(
+					`INSERT OR IGNORE INTO procedimentos (tipo, numero_normalizado, operacao)
+					 VALUES (?, ?, ?)`
+				)
+				.bind(fallbackTipo, numero, operacao || null)
+				.run();
+		} else {
+			throw err;
+		}
+	}
 
 	if (operacao) {
 		await db
