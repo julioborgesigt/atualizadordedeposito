@@ -143,11 +143,13 @@
 	});
 
 	const intervaloExibido = $derived.by(() => {
-		const { paginaAtual, porPagina, totalItens } = data.paginacao;
-		if (totalItens === 0 || data.bens.length === 0) return null;
+		const { paginaAtual, porPagina, totalProcedimentos, totalItens } = data.paginacao;
+		const total = totalProcedimentos ?? totalItens;
+		const qtdGrupos = gruposPorProcedimento.length;
+		if (total === 0 || qtdGrupos === 0) return null;
 		const inicio = (paginaAtual - 1) * porPagina + 1;
-		const fim = inicio + data.bens.length - 1;
-		return { inicio, fim, totalItens };
+		const fim = inicio + qtdGrupos - 1;
+		return { inicio, fim, totalItens: total };
 	});
 
 	const paginasVisiveis = $derived.by(() => {
@@ -615,9 +617,9 @@
 		<span class="visao-meta">
 			{#if intervaloExibido}
 				Exibindo <strong>{intervaloExibido.inicio}–{intervaloExibido.fim}</strong> de
-				<strong>{intervaloExibido.totalItens}</strong> item(ns)
+				<strong>{intervaloExibido.totalItens}</strong> {intervaloExibido.totalItens === 1 ? 'procedimento' : 'procedimentos'}
 			{:else}
-				<strong>0</strong> item(ns) exibido(s)
+				<strong>0</strong> procedimentos exibidos
 			{/if}
 		</span>
 	</div>
@@ -814,66 +816,71 @@
 	{/each}
 </div>
 
-{#if data.paginacao.totalPaginas > 1}
-	<nav class="paginacao" aria-label="Paginação de itens">
+{#if data.paginacao.totalItens > 0}
+	<nav class="paginacao" aria-label="Paginação de procedimentos">
 		<span class="paginacao-info">
-			Página <strong>{data.paginacao.paginaAtual}</strong> de
-			<strong>{data.paginacao.totalPaginas}</strong> · {data.paginacao.totalItens} itens
+			{#if data.paginacao.totalPaginas > 1}
+				Página <strong>{data.paginacao.paginaAtual}</strong> de
+				<strong>{data.paginacao.totalPaginas}</strong> ·
+			{/if}
+			<strong>{data.paginacao.totalItens}</strong> {data.paginacao.totalItens === 1 ? 'procedimento retraído' : 'procedimentos retraídos'}
 		</span>
 
-		<div class="paginacao-botoes">
-			<button
-				type="button"
-				class="page-btn"
-				disabled={data.paginacao.paginaAtual <= 1}
-				onclick={() => irParaPagina(data.paginacao.paginaAtual - 1)}
-				aria-label="Página anterior"
-			>
-				← Anterior
-			</button>
-
-			{#if paginasVisiveis[0] > 1}
-				<button type="button" class="page-btn num" onclick={() => irParaPagina(1)}>1</button>
-				{#if paginasVisiveis[0] > 2}
-					<span class="page-dots">…</span>
-				{/if}
-			{/if}
-
-			{#each paginasVisiveis as p}
+		{#if data.paginacao.totalPaginas > 1}
+			<div class="paginacao-botoes">
 				<button
 					type="button"
-					class="page-btn num"
-					class:active={p === data.paginacao.paginaAtual}
-					aria-current={p === data.paginacao.paginaAtual ? 'page' : undefined}
-					onclick={() => irParaPagina(p)}
+					class="page-btn"
+					disabled={data.paginacao.paginaAtual <= 1}
+					onclick={() => irParaPagina(data.paginacao.paginaAtual - 1)}
+					aria-label="Página anterior"
 				>
-					{p}
+					← Anterior
 				</button>
-			{/each}
 
-			{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas}
-				{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas - 1}
-					<span class="page-dots">…</span>
+				{#if paginasVisiveis[0] > 1}
+					<button type="button" class="page-btn num" onclick={() => irParaPagina(1)}>1</button>
+					{#if paginasVisiveis[0] > 2}
+						<span class="page-dots">…</span>
+					{/if}
 				{/if}
+
+				{#each paginasVisiveis as p}
+					<button
+						type="button"
+						class="page-btn num"
+						class:active={p === data.paginacao.paginaAtual}
+						aria-current={p === data.paginacao.paginaAtual ? 'page' : undefined}
+						onclick={() => irParaPagina(p)}
+					>
+						{p}
+					</button>
+				{/each}
+
+				{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas}
+					{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas - 1}
+						<span class="page-dots">…</span>
+					{/if}
+					<button
+						type="button"
+						class="page-btn num"
+						onclick={() => irParaPagina(data.paginacao.totalPaginas)}
+					>
+						{data.paginacao.totalPaginas}
+					</button>
+				{/if}
+
 				<button
 					type="button"
-					class="page-btn num"
-					onclick={() => irParaPagina(data.paginacao.totalPaginas)}
+					class="page-btn"
+					disabled={data.paginacao.paginaAtual >= data.paginacao.totalPaginas}
+					onclick={() => irParaPagina(data.paginacao.paginaAtual + 1)}
+					aria-label="Próxima página"
 				>
-					{data.paginacao.totalPaginas}
+					Próxima →
 				</button>
-			{/if}
-
-			<button
-				type="button"
-				class="page-btn"
-				disabled={data.paginacao.paginaAtual >= data.paginacao.totalPaginas}
-				onclick={() => irParaPagina(data.paginacao.paginaAtual + 1)}
-				aria-label="Próxima página"
-			>
-				Próxima →
-			</button>
-		</div>
+			</div>
+		{/if}
 	</nav>
 {/if}
 

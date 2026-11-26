@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import type { StatusBem } from '$lib/types';
 import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
-const POR_PAGINA = 20;
+const POR_PAGINA = 5;
 
 export interface BemLista {
 	id: number;
@@ -45,7 +45,13 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			procedimentos: [] as ProcedimentoDashboard[],
 			contadores: { total: 0, emDeposito: 0, restituidos: 0, semCaixa: 0 },
 			filtros: { q: '', status: '', caixa: '', procedimento: '' },
-			paginacao: { paginaAtual: 1, porPagina: POR_PAGINA, totalItens: 0, totalPaginas: 1 }
+			paginacao: {
+				paginaAtual: 1,
+				porPagina: POR_PAGINA,
+				totalItens: 0,
+				totalProcedimentos: 0,
+				totalPaginas: 1
+			}
 		};
 	}
 
@@ -90,38 +96,62 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 
 	const rowCount = await db
 		.prepare(
-			`SELECT COUNT(*) AS total
-			 FROM bens b
-			 JOIN procedimentos p ON p.id = b.procedimento_id
+			`SELECT COUNT(DISTINCT p.id) AS total
+			 FROM procedimentos p
+			 JOIN bens b ON b.procedimento_id = p.id
 			 LEFT JOIN caixas c ON c.id = b.caixa_id
 			 ${whereSql}`
 		)
 		.bind(...binds)
 		.first<{ total: number }>();
 
-	const totalItens = rowCount?.total ?? 0;
-	const totalPaginas = Math.max(1, Math.ceil(totalItens / POR_PAGINA));
+	const totalProcedimentos = rowCount?.total ?? 0;
+	const totalPaginas = Math.max(1, Math.ceil(totalProcedimentos / POR_PAGINA));
 	const paginaAtual = Math.min(
 		Math.max(1, Number.isInteger(paginaParam) ? paginaParam : 1),
 		totalPaginas
 	);
 	const offset = (paginaAtual - 1) * POR_PAGINA;
 
-	const { results: bens } = await db
-		.prepare(
-			`SELECT b.id, b.categoria, b.descricao_original, b.identificador_unico,
-			        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id,
-			        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
-			        c.nome AS caixa_nome
-			 FROM bens b
-			 JOIN procedimentos p ON p.id = b.procedimento_id
-			 LEFT JOIN caixas c ON c.id = b.caixa_id
-			 ${whereSql}
-			 ORDER BY p.numero_normalizado ASC, b.id ASC
-			 LIMIT ? OFFSET ?`
-		)
-		.bind(...binds, POR_PAGINA, offset)
-		.all<BemLista>();
+	let bens: BemLista[] = [];
+
+	if (totalProcedimentos > 0) {
+		const { results: procRows } = await db
+			.prepare(
+				`SELECT DISTINCT p.id, p.numero_normalizado
+				 FROM procedimentos p
+				 JOIN bens b ON b.procedimento_id = p.id
+				 LEFT JOIN caixas c ON c.id = b.caixa_id
+				 ${whereSql}
+				 ORDER BY p.numero_normalizado ASC
+				 LIMIT ? OFFSET ?`
+			)
+			.bind(...binds, POR_PAGINA, offset)
+			.all<{ id: number; numero_normalizado: string }>();
+
+		if (procRows && procRows.length > 0) {
+			const procIds = procRows.map((r) => r.id);
+			const placeholders = procIds.map(() => '?').join(',');
+
+			const { results: bensResult } = await db
+				.prepare(
+					`SELECT b.id, b.categoria, b.descricao_original, b.identificador_unico,
+					        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id,
+					        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
+					        c.nome AS caixa_nome
+					 FROM bens b
+					 JOIN procedimentos p ON p.id = b.procedimento_id
+					 LEFT JOIN caixas c ON c.id = b.caixa_id
+					 WHERE b.procedimento_id IN (${placeholders})
+					 ${where.length ? `AND (${where.join(' AND ')})` : ''}
+					 ORDER BY p.numero_normalizado ASC, b.id ASC`
+				)
+				.bind(...procIds, ...binds)
+				.all<BemLista>();
+
+			bens = bensResult ?? [];
+		}
+	}
 
 	const { results: caixasRaw } = await db
 		.prepare(
@@ -190,7 +220,8 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		paginacao: {
 			paginaAtual,
 			porPagina: POR_PAGINA,
-			totalItens,
+			totalItens: totalProcedimentos,
+			totalProcedimentos,
 			totalPaginas
 		}
 	};
