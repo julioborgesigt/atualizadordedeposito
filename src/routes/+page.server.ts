@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import type { StatusBem } from '$lib/types';
 import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
 
-const POR_PAGINA = 5;
+export type PorPaginaOpcao = '10' | '20' | '50' | '100' | 'todos';
 
 export interface BemLista {
 	id: number;
@@ -36,6 +36,15 @@ export interface ProcedimentoDashboard {
 	total_bens: number;
 }
 
+export interface PaginacaoDashboard {
+	paginaAtual: number;
+	porPagina: number;
+	porPaginaOpcao: PorPaginaOpcao;
+	totalItens: number;
+	totalProcedimentos: number;
+	totalPaginas: number;
+}
+
 export const load: PageServerLoad = async ({ url, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) {
@@ -47,7 +56,8 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			filtros: { q: '', status: '', caixa: '', procedimento: '' },
 			paginacao: {
 				paginaAtual: 1,
-				porPagina: POR_PAGINA,
+				porPagina: 10,
+				porPaginaOpcao: '10' as PorPaginaOpcao,
 				totalItens: 0,
 				totalProcedimentos: 0,
 				totalPaginas: 1
@@ -63,6 +73,18 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 	const caixa = url.searchParams.get('caixa')?.trim() ?? '';
 	const procedimento = url.searchParams.get('procedimento')?.trim() ?? '';
 	const paginaParam = Number(url.searchParams.get('pagina') ?? '1');
+	const porPaginaParam = url.searchParams.get('porPagina')?.trim().toLowerCase() ?? '10';
+
+	let porPaginaOpcao: PorPaginaOpcao = '10';
+	let porPagina = 10;
+
+	if (porPaginaParam === 'todos') {
+		porPaginaOpcao = 'todos';
+		porPagina = 999999;
+	} else if (['10', '20', '50', '100'].includes(porPaginaParam)) {
+		porPaginaOpcao = porPaginaParam as PorPaginaOpcao;
+		porPagina = Number(porPaginaParam);
+	}
 
 	const where: string[] = [];
 	const binds: unknown[] = [];
@@ -106,12 +128,12 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		.first<{ total: number }>();
 
 	const totalProcedimentos = rowCount?.total ?? 0;
-	const totalPaginas = Math.max(1, Math.ceil(totalProcedimentos / POR_PAGINA));
+	const totalPaginas = Math.max(1, Math.ceil(totalProcedimentos / porPagina));
 	const paginaAtual = Math.min(
 		Math.max(1, Number.isInteger(paginaParam) ? paginaParam : 1),
 		totalPaginas
 	);
-	const offset = (paginaAtual - 1) * POR_PAGINA;
+	const offset = (paginaAtual - 1) * porPagina;
 
 	let bens: BemLista[] = [];
 
@@ -126,7 +148,7 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 				 ORDER BY p.numero_normalizado ASC
 				 LIMIT ? OFFSET ?`
 			)
-			.bind(...binds, POR_PAGINA, offset)
+			.bind(...binds, porPagina, offset)
 			.all<{ id: number; numero_normalizado: string }>();
 
 		if (procRows && procRows.length > 0) {
@@ -219,7 +241,8 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		filtros: { q, status, caixa, procedimento },
 		paginacao: {
 			paginaAtual,
-			porPagina: POR_PAGINA,
+			porPagina,
+			porPaginaOpcao,
 			totalItens: totalProcedimentos,
 			totalProcedimentos,
 			totalPaginas

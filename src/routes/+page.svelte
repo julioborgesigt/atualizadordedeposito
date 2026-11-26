@@ -181,17 +181,25 @@
 		}
 	}
 
-	function aplicarFiltros(novos: { caixa?: string; procedimento?: string; pagina?: number }) {
+	function aplicarFiltros(novos: {
+		caixa?: string;
+		procedimento?: string;
+		pagina?: number;
+		porPagina?: string;
+	}) {
 		const params = new URLSearchParams();
 		const caixaVal = novos.caixa !== undefined ? novos.caixa : data.filtros.caixa;
 		const procVal =
 			novos.procedimento !== undefined ? novos.procedimento : data.filtros.procedimento;
 		const paginaVal = novos.pagina ?? 1;
+		const porPaginaVal =
+			novos.porPagina !== undefined ? novos.porPagina : data.paginacao.porPaginaOpcao;
 
 		if (data.filtros.q) params.set('q', data.filtros.q);
 		if (data.filtros.status) params.set('status', data.filtros.status);
 		if (caixaVal) params.set('caixa', caixaVal);
 		if (procVal) params.set('procedimento', procVal);
+		if (porPaginaVal && porPaginaVal !== '10') params.set('porPagina', porPaginaVal);
 		if (paginaVal > 1) params.set('pagina', String(paginaVal));
 
 		selecionados = [];
@@ -205,6 +213,10 @@
 
 	function filtrarPorProcedimento(valorProc: string) {
 		aplicarFiltros({ procedimento: valorProc, pagina: 1 });
+	}
+
+	function alterarPorPagina(novoValor: string) {
+		aplicarFiltros({ porPagina: novoValor, pagina: 1 });
 	}
 
 	function irParaPagina(pagina: number) {
@@ -486,6 +498,9 @@
 {/if}
 
 <form method="GET" class="filtros panel" role="search">
+	{#if data.paginacao.porPaginaOpcao && data.paginacao.porPaginaOpcao !== '10'}
+		<input type="hidden" name="porPagina" value={data.paginacao.porPaginaOpcao} />
+	{/if}
 	<div class="f-busca">
 		<svg class="f-busca-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
 		<input
@@ -528,7 +543,12 @@
 	<div class="f-acoes">
 		<button type="submit" class="btn btn-dark">Filtrar</button>
 		{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento}
-			<a href="/" class="btn btn-ghost">Limpar</a>
+			<a
+				href={data.paginacao.porPaginaOpcao && data.paginacao.porPaginaOpcao !== '10'
+					? `/?porPagina=${data.paginacao.porPaginaOpcao}`
+					: '/'}
+				class="btn btn-ghost">Limpar</a
+			>
 		{/if}
 	</div>
 </form>
@@ -681,24 +701,14 @@
 						class="proc-toggle-btn"
 						onclick={() => alternarExpansao(grupo.chave)}
 						aria-expanded={expandido}
+						title={expandido ? 'Clique para recolher os itens' : 'Clique para exibir os itens'}
 					>
-						<span class="chevron-icon" class:open={expandido} aria-hidden="true">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-								<path d="m9 18 6-6-6-6" />
-							</svg>
-						</span>
-
-						<div class="proc-titulos">
-							<div class="proc-identificacao">
-								<span class="proc-tipo-badge">{grupo.proc_tipo}</span>
-								<strong class="proc-numero">{grupo.proc_numero}</strong>
-								{#if grupo.operacao}
-									<span class="proc-operacao">• {grupo.operacao}</span>
-								{/if}
-							</div>
-							<span class="proc-sub">
-								{expandido ? 'Clique para recolher os itens' : 'Clique para exibir os itens apreendidos'}
-							</span>
+						<div class="proc-identificacao">
+							<span class="proc-tipo-badge">{grupo.proc_tipo}</span>
+							<strong class="proc-numero">{grupo.proc_numero}</strong>
+							{#if grupo.operacao}
+								<span class="proc-operacao">• {grupo.operacao}</span>
+							{/if}
 						</div>
 					</button>
 				</div>
@@ -821,68 +831,91 @@
 {#if data.paginacao.totalItens > 0}
 	<nav class="paginacao" aria-label="Paginação de procedimentos">
 		<span class="paginacao-info">
-			{#if data.paginacao.totalPaginas > 1}
-				Página <strong>{data.paginacao.paginaAtual}</strong> de
-				<strong>{data.paginacao.totalPaginas}</strong> ·
+			{#if data.paginacao.porPaginaOpcao === 'todos'}
+				Exibindo todos os <strong>{data.paginacao.totalItens}</strong> procedimentos retraídos
+			{:else}
+				{#if data.paginacao.totalPaginas > 1}
+					Página <strong>{data.paginacao.paginaAtual}</strong> de
+					<strong>{data.paginacao.totalPaginas}</strong> ·
+				{/if}
+				<strong>{data.paginacao.totalItens}</strong> {data.paginacao.totalItens === 1 ? 'procedimento retraído' : 'procedimentos retraídos'}
 			{/if}
-			<strong>{data.paginacao.totalItens}</strong> {data.paginacao.totalItens === 1 ? 'procedimento retraído' : 'procedimentos retraídos'}
 		</span>
 
-		{#if data.paginacao.totalPaginas > 1}
-			<div class="paginacao-botoes">
-				<button
-					type="button"
-					class="page-btn"
-					disabled={data.paginacao.paginaAtual <= 1}
-					onclick={() => irParaPagina(data.paginacao.paginaAtual - 1)}
-					aria-label="Página anterior"
+		<div class="paginacao-controles">
+			<div class="por-pagina-wrap">
+				<label for="select-por-pagina" class="por-pagina-label">Exibir:</label>
+				<select
+					id="select-por-pagina"
+					class="por-pagina-select"
+					value={data.paginacao.porPaginaOpcao}
+					onchange={(e) => alterarPorPagina(e.currentTarget.value)}
+					aria-label="Quantidade de procedimentos por página"
 				>
-					← Anterior
-				</button>
-
-				{#if paginasVisiveis[0] > 1}
-					<button type="button" class="page-btn num" onclick={() => irParaPagina(1)}>1</button>
-					{#if paginasVisiveis[0] > 2}
-						<span class="page-dots">…</span>
-					{/if}
-				{/if}
-
-				{#each paginasVisiveis as p}
-					<button
-						type="button"
-						class="page-btn num"
-						class:active={p === data.paginacao.paginaAtual}
-						aria-current={p === data.paginacao.paginaAtual ? 'page' : undefined}
-						onclick={() => irParaPagina(p)}
-					>
-						{p}
-					</button>
-				{/each}
-
-				{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas}
-					{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas - 1}
-						<span class="page-dots">…</span>
-					{/if}
-					<button
-						type="button"
-						class="page-btn num"
-						onclick={() => irParaPagina(data.paginacao.totalPaginas)}
-					>
-						{data.paginacao.totalPaginas}
-					</button>
-				{/if}
-
-				<button
-					type="button"
-					class="page-btn"
-					disabled={data.paginacao.paginaAtual >= data.paginacao.totalPaginas}
-					onclick={() => irParaPagina(data.paginacao.paginaAtual + 1)}
-					aria-label="Próxima página"
-				>
-					Próxima →
-				</button>
+					<option value="10">10 por página</option>
+					<option value="20">20 por página</option>
+					<option value="50">50 por página</option>
+					<option value="100">100 por página</option>
+					<option value="todos">Todos</option>
+				</select>
 			</div>
-		{/if}
+
+			{#if data.paginacao.totalPaginas > 1}
+				<div class="paginacao-botoes">
+					<button
+						type="button"
+						class="page-btn"
+						disabled={data.paginacao.paginaAtual <= 1}
+						onclick={() => irParaPagina(data.paginacao.paginaAtual - 1)}
+						aria-label="Página anterior"
+					>
+						← Anterior
+					</button>
+
+					{#if paginasVisiveis[0] > 1}
+						<button type="button" class="page-btn num" onclick={() => irParaPagina(1)}>1</button>
+						{#if paginasVisiveis[0] > 2}
+							<span class="page-dots">…</span>
+						{/if}
+					{/if}
+
+					{#each paginasVisiveis as p}
+						<button
+							type="button"
+							class="page-btn num"
+							class:active={p === data.paginacao.paginaAtual}
+							aria-current={p === data.paginacao.paginaAtual ? 'page' : undefined}
+							onclick={() => irParaPagina(p)}
+						>
+							{p}
+						</button>
+					{/each}
+
+					{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas}
+						{#if paginasVisiveis[paginasVisiveis.length - 1] < data.paginacao.totalPaginas - 1}
+							<span class="page-dots">…</span>
+						{/if}
+						<button
+							type="button"
+							class="page-btn num"
+							onclick={() => irParaPagina(data.paginacao.totalPaginas)}
+						>
+							{data.paginacao.totalPaginas}
+						</button>
+					{/if}
+
+					<button
+						type="button"
+						class="page-btn"
+						disabled={data.paginacao.paginaAtual >= data.paginacao.totalPaginas}
+						onclick={() => irParaPagina(data.paginacao.paginaAtual + 1)}
+						aria-label="Próxima página"
+					>
+						Próxima →
+					</button>
+				</div>
+			{/if}
+		</div>
 	</nav>
 {/if}
 
@@ -1185,46 +1218,60 @@
 		padding: 0.2rem;
 	}
 	.proc-toggle-btn {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
-		gap: 0.75rem;
 		background: transparent;
 		border: none;
 		padding: 0.25rem 0;
 		cursor: pointer;
 		text-align: left;
 		min-width: 0;
-		flex: 1;
 		color: inherit;
+		font: inherit;
 	}
-	.chevron-icon {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		flex-shrink: 0;
-		border-radius: var(--radius-sm);
-		background: var(--surface-3);
-		color: var(--text-2);
-		transition: transform 0.18s ease, background 0.12s, color 0.12s;
-	}
-	.chevron-icon.open {
-		transform: rotate(90deg);
-		background: var(--primary-soft);
+	.proc-toggle-btn:hover .proc-numero {
 		color: var(--primary);
-	}
-	.proc-titulos {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-		min-width: 0;
 	}
 	.proc-identificacao {
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
 		flex-wrap: wrap;
+	}
+	.paginacao-controles {
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+		flex-wrap: wrap;
+	}
+	.por-pagina-wrap {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.84rem;
+		color: var(--text-2);
+	}
+	.por-pagina-label {
+		font-weight: 500;
+	}
+	.por-pagina-select {
+		height: 36px;
+		padding: 0 0.65rem;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		background-color: var(--surface);
+		color: var(--text);
+		font-size: 0.84rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: border-color 0.15s, background-color 0.15s;
+	}
+	.por-pagina-select:hover {
+		border-color: var(--primary);
+	}
+	.por-pagina-select:focus {
+		outline: 2px solid var(--primary);
+		outline-offset: 1px;
 	}
 	.proc-tipo-badge {
 		display: inline-block;
@@ -1476,9 +1523,19 @@
 
 		.proc-card-header {
 			padding: 0.75rem 0.85rem;
+			gap: 0.6rem;
 		}
-		.proc-header-right .toggle-action-btn {
-			display: none;
+		.proc-header-left {
+			width: 100%;
+		}
+		.proc-header-right {
+			width: 100%;
+			justify-content: space-between;
+		}
+		.paginacao-controles {
+			width: 100%;
+			justify-content: center;
+			gap: 0.65rem;
 		}
 		.proc-itens-wrap {
 			padding: 0.5rem 0.65rem 0.75rem;
