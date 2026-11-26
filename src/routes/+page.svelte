@@ -36,6 +36,7 @@
 		proc_tipo: string;
 		proc_numero: string;
 		operacao: string | null;
+		unidade_nome: string | null;
 		itens: BemLista[];
 		totalItens: number;
 		emDeposito: number;
@@ -53,6 +54,7 @@
 					proc_tipo: bem.proc_tipo,
 					proc_numero: bem.proc_numero,
 					operacao: bem.operacao,
+					unidade_nome: bem.unidade_nome ?? null,
 					itens: [],
 					totalItens: 0,
 					emDeposito: 0,
@@ -185,10 +187,12 @@
 	function aplicarFiltros(novos: {
 		caixa?: string;
 		procedimento?: string;
+		unidade?: string;
 		pagina?: number;
 		porPagina?: string;
 	}) {
 		const params = new URLSearchParams();
+		const unidadeVal = novos.unidade !== undefined ? novos.unidade : data.filtros.unidade;
 		const caixaVal = novos.caixa !== undefined ? novos.caixa : data.filtros.caixa;
 		const procVal =
 			novos.procedimento !== undefined ? novos.procedimento : data.filtros.procedimento;
@@ -198,6 +202,7 @@
 
 		if (data.filtros.q) params.set('q', data.filtros.q);
 		if (data.filtros.status) params.set('status', data.filtros.status);
+		if (unidadeVal) params.set('unidade', unidadeVal);
 		if (caixaVal) params.set('caixa', caixaVal);
 		if (procVal) params.set('procedimento', procVal);
 		if (porPaginaVal && porPaginaVal !== '10') params.set('porPagina', porPaginaVal);
@@ -206,6 +211,10 @@
 		selecionados = [];
 		const qs = params.toString();
 		goto(qs ? `/?${qs}` : '/');
+	}
+
+	function filtrarPorUnidade(valorUnidade: string) {
+		aplicarFiltros({ unidade: valorUnidade, caixa: '', procedimento: '', pagina: 1 });
 	}
 
 	function filtrarPorCaixa(valorCaixa: string) {
@@ -355,6 +364,7 @@
 			const params = new URLSearchParams();
 			if (data.filtros.q) params.set('q', data.filtros.q);
 			if (data.filtros.status) params.set('status', data.filtros.status);
+			if (data.filtros.unidade) params.set('unidade', data.filtros.unidade);
 			if (data.filtros.caixa) params.set('caixa', data.filtros.caixa);
 			if (data.filtros.procedimento) params.set('procedimento', data.filtros.procedimento);
 
@@ -414,6 +424,7 @@
 				const params = new URLSearchParams();
 				if (data.filtros.q) params.set('q', data.filtros.q);
 				if (data.filtros.status) params.set('status', data.filtros.status);
+				if (data.filtros.unidade) params.set('unidade', data.filtros.unidade);
 				if (data.filtros.caixa) params.set('caixa', data.filtros.caixa);
 				if (data.filtros.procedimento) params.set('procedimento', data.filtros.procedimento);
 				const qs = params.toString();
@@ -531,6 +542,20 @@
 			aria-label="Buscar bens"
 		/>
 	</div>
+	{#if data.unidade?.role === 'ADMIN' && data.unidades.length > 0}
+		<select
+			id="filtro-unidade"
+			name="unidade"
+			value={data.filtros.unidade}
+			aria-label="Filtrar por unidade"
+			onchange={(e) => filtrarPorUnidade(e.currentTarget.value)}
+		>
+			<option value="">Todas as unidades</option>
+			{#each data.unidades as u}
+				<option value={String(u.id)}>{u.nome} ({u.total_bens})</option>
+			{/each}
+		</select>
+	{/if}
 	<select
 		id="filtro-status"
 		name="status"
@@ -561,7 +586,7 @@
 	/>
 	<div class="f-acoes">
 		<button type="submit" class="btn btn-dark">Filtrar</button>
-		{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento}
+		{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento || data.filtros.unidade}
 			<a
 				href={data.paginacao.porPaginaOpcao && data.paginacao.porPaginaOpcao !== '10'
 					? `/?porPagina=${data.paginacao.porPaginaOpcao}`
@@ -725,6 +750,9 @@
 						<div class="proc-identificacao">
 							<span class="proc-tipo-badge">{grupo.proc_tipo}</span>
 							<strong class="proc-numero">{grupo.proc_numero}</strong>
+							{#if data.unidade?.role === 'ADMIN' && grupo.unidade_nome}
+								<span class="badge purple">{grupo.unidade_nome}</span>
+							{/if}
 							{#if grupo.operacao}
 								<span class="proc-operacao">• {grupo.operacao}</span>
 							{/if}

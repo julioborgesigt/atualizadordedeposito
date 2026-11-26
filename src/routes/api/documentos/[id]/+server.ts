@@ -1,21 +1,32 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
+import { exigirUnidade } from '$lib/server/auth';
 
-export const DELETE: RequestHandler = async ({ params, platform }) => {
+export const DELETE: RequestHandler = async ({ params, platform, locals }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB não configurado.');
-	await ensureSchema(db);
+	await ensureSchema(db, platform.env.ADMIN_INITIAL_PASSWORD);
+	const unidade = exigirUnidade(locals);
 
 	const docId = Number(params.id);
 	if (!Number.isInteger(docId)) throw error(400, 'ID de documento inválido.');
 
 	const doc = await db
-		.prepare('SELECT id, procedimento_id, tipo, nome_arquivo FROM documentos WHERE id = ?')
+		.prepare('SELECT id, procedimento_id, tipo, nome_arquivo, unidade_id FROM documentos WHERE id = ?')
 		.bind(docId)
-		.first<{ id: number; procedimento_id: number; tipo: string; nome_arquivo: string }>();
+		.first<{
+			id: number;
+			procedimento_id: number;
+			tipo: string;
+			nome_arquivo: string;
+			unidade_id: number | null;
+		}>();
 
 	if (!doc) throw error(404, 'Documento não encontrado.');
+	if (unidade.role !== 'ADMIN' && doc.unidade_id !== unidade.id) {
+		throw error(403, 'Sem permissão para excluir este documento.');
+	}
 
 	if (doc.tipo === 'APREENSAO') {
 		// Busca os bens criados nesta apreensão

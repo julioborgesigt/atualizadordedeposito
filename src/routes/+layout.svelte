@@ -1,18 +1,31 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/state';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
 	import IndicadorTarefa from '$lib/components/IndicadorTarefa.svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
 
 	let menuAberto = $state(false);
+	let saindo = $state(false);
 
-	const links = [
-		{ href: '/', label: 'Depósito / Bens', curto: 'Bens', icon: 'bens' },
-		{ href: '/gerenciar', label: 'Caixas e Apreensões', curto: 'Gerenciar', icon: 'caixas' },
-		{ href: '/importar', label: 'Importar PDFs', curto: 'Importar', icon: 'importar' }
-	] as const;
+	const unidade = $derived(data.unidade);
+	const mostrarNav = $derived(Boolean(unidade && !unidade.deve_trocar_senha));
+
+	const links = $derived(
+		unidade?.role === 'ADMIN'
+			? ([
+					{ href: '/', label: 'Depósito / Bens', icon: 'bens' },
+					{ href: '/gerenciar', label: 'Caixas e Apreensões', icon: 'caixas' },
+					{ href: '/importar', label: 'Importar PDFs', icon: 'importar' },
+					{ href: '/admin/unidades', label: 'Unidades', icon: 'unidades' }
+				] as const)
+			: ([
+					{ href: '/', label: 'Depósito / Bens', icon: 'bens' },
+					{ href: '/gerenciar', label: 'Caixas e Apreensões', icon: 'caixas' },
+					{ href: '/importar', label: 'Importar PDFs', icon: 'importar' }
+				] as const)
+	);
 
 	afterNavigate(() => {
 		menuAberto = false;
@@ -21,6 +34,18 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') menuAberto = false;
 	}
+
+	async function sair() {
+		if (saindo) return;
+		saindo = true;
+		try {
+			await fetch('/api/auth/logout', { method: 'POST' });
+			await invalidateAll();
+			await goto('/login');
+		} finally {
+			saindo = false;
+		}
+	}
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -28,7 +53,7 @@
 <div class="shell">
 	<header class="topbar">
 		<div class="topbar-inner">
-			<a href="/" class="brand" aria-label="Custódia PCCE — página inicial">
+			<a href={mostrarNav ? '/' : '/login'} class="brand" aria-label="Custódia PCCE — página inicial">
 				<span class="brand-mark" aria-hidden="true">
 					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
@@ -37,46 +62,64 @@
 				</span>
 				<span class="brand-text">
 					<strong>Custódia PCCE</strong>
-					<span>Apreensões e Restituições</span>
+					<span>{unidade ? unidade.nome : 'Apreensões e Restituições'}</span>
 				</span>
 			</a>
 
-			<button
-				type="button"
-				class="menu-toggle"
-				aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
-				aria-expanded={menuAberto}
-				aria-controls="nav-principal"
-				onclick={() => (menuAberto = !menuAberto)}
-			>
-				{#if menuAberto}
-					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-				{:else}
-					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-				{/if}
-			</button>
+			{#if mostrarNav}
+				<button
+					type="button"
+					class="menu-toggle"
+					aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
+					aria-expanded={menuAberto}
+					aria-controls="nav-principal"
+					onclick={() => (menuAberto = !menuAberto)}
+				>
+					{#if menuAberto}
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+					{:else}
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+					{/if}
+				</button>
 
-			<nav id="nav-principal" class="nav" class:open={menuAberto} aria-label="Navegação principal">
-				{#each links as link}
-					<a
-						href={link.href}
-						class="nav-link"
-						class:active={page.url.pathname === link.href}
-						aria-current={page.url.pathname === link.href ? 'page' : undefined}
-					>
-						<span class="nav-icon" aria-hidden="true">
-							{#if link.icon === 'bens'}
-								<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /></svg>
-							{:else if link.icon === 'caixas'}
-								<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>
-							{:else}
-								<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5M12 3v12" /></svg>
-							{/if}
-						</span>
-						{link.label}
-					</a>
-				{/each}
-			</nav>
+				<nav id="nav-principal" class="nav" class:open={menuAberto} aria-label="Navegação principal">
+					{#each links as link}
+						<a
+							href={link.href}
+							class="nav-link"
+							class:active={page.url.pathname === link.href}
+							aria-current={page.url.pathname === link.href ? 'page' : undefined}
+						>
+							<span class="nav-icon" aria-hidden="true">
+								{#if link.icon === 'bens'}
+									<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /></svg>
+								{:else if link.icon === 'caixas'}
+									<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>
+								{:else if link.icon === 'importar'}
+									<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5M12 3v12" /></svg>
+								{:else}
+									<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01" /></svg>
+								{/if}
+							</span>
+							{link.label}
+						</a>
+					{/each}
+
+					<div class="nav-user">
+						<a
+							href="/trocar-senha"
+							class="nav-link nav-sub"
+							class:active={page.url.pathname === '/trocar-senha'}
+							title="Alterar senha da unidade"
+						>
+							Senha
+						</a>
+						<button type="button" class="nav-logout" onclick={sair} disabled={saindo}>
+							{saindo ? 'Saindo...' : 'Sair'}
+						</button>
+					</div>
+				</nav>
+			{/if}
 		</div>
 	</header>
 
@@ -160,7 +203,7 @@
 
 	.brand-text span {
 		font-size: 0.74rem;
-		color: hsl(220 15% 64%);
+		color: hsl(220 15% 68%);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -169,18 +212,18 @@
 	.nav {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.2rem;
 	}
 
 	.nav-link {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.85rem;
+		gap: 0.45rem;
+		padding: 0.5rem 0.75rem;
 		border-radius: 8px;
 		color: hsl(220 18% 76%);
 		text-decoration: none;
-		font-size: 0.875rem;
+		font-size: 0.86rem;
 		font-weight: 500;
 		transition:
 			background 0.15s,
@@ -208,6 +251,40 @@
 		color: hsl(213 94% 72%);
 	}
 
+	.nav-user {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		margin-left: 0.45rem;
+		padding-left: 0.55rem;
+		border-left: 1px solid hsl(222 30% 24%);
+	}
+
+	.nav-sub {
+		font-size: 0.82rem;
+		padding: 0.42rem 0.6rem;
+	}
+
+	.nav-logout {
+		border: 1px solid hsl(0 0% 100% / 0.16);
+		background: hsl(0 0% 100% / 0.06);
+		color: hsl(220 18% 86%);
+		border-radius: 8px;
+		padding: 0.42rem 0.72rem;
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background 0.15s,
+			color 0.15s;
+	}
+
+	.nav-logout:hover {
+		background: hsl(350 72% 45% / 0.25);
+		border-color: hsl(350 72% 60% / 0.5);
+		color: #fff;
+	}
+
 	.menu-toggle {
 		display: none;
 		align-items: center;
@@ -231,7 +308,7 @@
 		padding: 1.6rem 1.25rem 4rem;
 	}
 
-	@media (max-width: 860px) {
+	@media (max-width: 960px) {
 		.menu-toggle {
 			display: inline-flex;
 		}
@@ -269,6 +346,21 @@
 		.nav-link {
 			padding: 0.85rem 0.9rem;
 			font-size: 0.97rem;
+		}
+
+		.nav-user {
+			margin-left: 0;
+			padding-left: 0;
+			margin-top: 0.45rem;
+			padding-top: 0.55rem;
+			border-left: none;
+			border-top: 1px solid hsl(222 30% 22%);
+			justify-content: space-between;
+		}
+
+		.nav-logout {
+			padding: 0.65rem 1rem;
+			font-size: 0.9rem;
 		}
 
 		.nav-backdrop {

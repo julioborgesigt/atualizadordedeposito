@@ -3,12 +3,15 @@ import type { RequestHandler } from './$types';
 import type { DocumentoParseado, PreviewDocumento } from '$lib/types';
 import { conciliarRestituicao, type CandidatoBem } from '$lib/server/matcher';
 import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
+import { exigirUnidade } from '$lib/server/auth';
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB (Cloudflare D1) não configurado.');
-	await ensureSchema(db);
+	await ensureSchema(db, platform.env.ADMIN_INITIAL_PASSWORD);
 	await limparResquiciosOrfaos(db);
+
+	const unidade = exigirUnidade(locals);
 
 	const { documentos } = (await request.json()) as { documentos: DocumentoParseado[] };
 	if (!Array.isArray(documentos) || documentos.length === 0) {
@@ -25,14 +28,17 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const hashes = ordenados.map((d) => d.hashSha256);
 	const placeholdersHash = hashes.map(() => '?').join(',');
 	const { results: docsExistentes } = await db
-		.prepare(`SELECT hash_sha256 FROM documentos WHERE hash_sha256 IN (${placeholdersHash})`)
-		.bind(...hashes)
+		.prepare(
+			`SELECT hash_sha256 FROM documentos WHERE hash_sha256 IN (${placeholdersHash}) AND unidade_id = ?`
+		)
+		.bind(...hashes, unidade.id)
 		.all<{ hash_sha256: string }>();
 
 	const hashesImportados = new Set(docsExistentes.map((r) => r.hash_sha256));
 
 	const { results: caixas } = await db
-		.prepare('SELECT id, nome FROM caixas ORDER BY nome ASC')
+		.prepare('SELECT id, nome FROM caixas WHERE unidade_id = ? ORDER BY nome ASC')
+		.bind(unidade.id)
 		.all<{ id: number; nome: string }>();
 
 	const numerosProc = [...new Set(ordenados.map((d) => d.numeroProcedimento))];
@@ -45,14 +51,15 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				        b.identificador_unico, b.qtd_disponivel
 				 FROM bens b
 				 JOIN procedimentos p ON p.id = b.procedimento_id
-				 WHERE b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL')
+				 WHERE b.unidade_id = ?
+				   AND b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL')
 				   AND (
 				     p.numero_normalizado = ?
-				     OR p.procedimento_principal_id IN (SELECT id FROM procedimentos WHERE numero_normalizado = ?)
-				     OR p.id IN (SELECT procedimento_principal_id FROM procedimentos WHERE numero_normalizado = ? AND procedimento_principal_id IS NOT NULL)
+				     OR p.procedimento_principal_id IN (SELECT id FROM procedimentos WHERE numero_normalizado = ? AND unidade_id = ?)
+				     OR p.id IN (SELECT procedimento_principal_id FROM procedimentos WHERE numero_normalizado = ? AND unidade_id = ? AND procedimento_principal_id IS NOT NULL)
 				   )`
 			)
-			.bind(num, num, num)
+			.bind(unidade.id, num, num, unidade.id, num, unidade.id)
 			.all<{
 				id: number;
 				descricao_original: string;

@@ -1,20 +1,31 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ensureSchema } from '$lib/server/db';
+import { exigirUnidade } from '$lib/server/auth';
 import type { BemLista } from '../../../+page.server';
 
-export const GET: RequestHandler = async ({ url, platform }) => {
+export const GET: RequestHandler = async ({ url, platform, locals }) => {
 	const db = platform?.env?.DB;
 	if (!db) throw error(500, 'Binding DB não configurado.');
-	await ensureSchema(db);
+	await ensureSchema(db, platform.env.ADMIN_INITIAL_PASSWORD);
+	const unidade = exigirUnidade(locals);
 
 	const q = url.searchParams.get('q')?.trim() ?? '';
 	const status = url.searchParams.get('status')?.trim() ?? '';
 	const caixa = url.searchParams.get('caixa')?.trim() ?? '';
 	const procedimento = url.searchParams.get('procedimento')?.trim() ?? '';
+	const unidadeFiltro = url.searchParams.get('unidade')?.trim() ?? '';
 
 	const where: string[] = [];
 	const binds: unknown[] = [];
+
+	if (unidade.role !== 'ADMIN') {
+		where.push('b.unidade_id = ?');
+		binds.push(unidade.id);
+	} else if (unidadeFiltro) {
+		where.push('b.unidade_id = ?');
+		binds.push(Number(unidadeFiltro));
+	}
 
 	if (q) {
 		const qLimpo = q.trim();
@@ -65,10 +76,11 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 			`SELECT b.id, b.categoria, b.descricao_original, b.identificador_unico,
 			        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id,
 			        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
-			        c.nome AS caixa_nome
+			        c.nome AS caixa_nome, u.nome AS unidade_nome
 			 FROM bens b
 			 JOIN procedimentos p ON p.id = b.procedimento_id
 			 LEFT JOIN caixas c ON c.id = b.caixa_id
+			 LEFT JOIN unidades u ON u.id = b.unidade_id
 			 ${whereSql}
 			 ORDER BY c.nome ASC, p.numero_normalizado ASC, b.id ASC`
 		)

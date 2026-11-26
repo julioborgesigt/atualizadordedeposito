@@ -18,6 +18,7 @@ export interface BemLista {
 	proc_numero: string;
 	operacao: string | null;
 	caixa_nome: string | null;
+	unidade_nome?: string | null;
 }
 
 export interface CaixaDashboard {
@@ -26,6 +27,7 @@ export interface CaixaDashboard {
 	setor: string | null;
 	total_bens: number;
 	em_deposito: number;
+	unidade_nome?: string | null;
 }
 
 export interface ProcedimentoDashboard {
@@ -33,6 +35,13 @@ export interface ProcedimentoDashboard {
 	tipo: string;
 	numero_normalizado: string;
 	operacao: string | null;
+	total_bens: number;
+	unidade_nome?: string | null;
+}
+
+export interface UnidadeFiltroItem {
+	id: number;
+	nome: string;
 	total_bens: number;
 }
 
@@ -45,15 +54,17 @@ export interface PaginacaoDashboard {
 	totalPaginas: number;
 }
 
-export const load: PageServerLoad = async ({ url, platform }) => {
+export const load: PageServerLoad = async ({ url, platform, locals }) => {
 	const db = platform?.env?.DB;
-	if (!db) {
+	const unidadeAtual = locals.unidade;
+	if (!db || !unidadeAtual) {
 		return {
 			bens: [] as BemLista[],
 			caixas: [] as CaixaDashboard[],
 			procedimentos: [] as ProcedimentoDashboard[],
+			unidades: [] as UnidadeFiltroItem[],
 			contadores: { total: 0, emDeposito: 0, restituidos: 0, semCaixa: 0 },
-			filtros: { q: '', status: '', caixa: '', procedimento: '' },
+			filtros: { q: '', status: '', caixa: '', procedimento: '', unidade: '' },
 			paginacao: {
 				paginaAtual: 1,
 				porPagina: 10,
@@ -65,13 +76,16 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		};
 	}
 
-	await ensureSchema(db);
+	await ensureSchema(db, platform.env.ADMIN_INITIAL_PASSWORD);
 	await limparResquiciosOrfaos(db);
+
+	const ehAdmin = unidadeAtual.role === 'ADMIN';
 
 	const q = url.searchParams.get('q')?.trim() ?? '';
 	const status = url.searchParams.get('status')?.trim() ?? '';
 	const caixa = url.searchParams.get('caixa')?.trim() ?? '';
 	const procedimento = url.searchParams.get('procedimento')?.trim() ?? '';
+	const unidadeFiltro = ehAdmin ? (url.searchParams.get('unidade')?.trim() ?? '') : '';
 	const paginaParam = Number(url.searchParams.get('pagina') ?? '1');
 	const porPaginaParam = url.searchParams.get('porPagina')?.trim().toLowerCase() ?? '10';
 
@@ -86,8 +100,19 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		porPagina = Number(porPaginaParam);
 	}
 
+	const unidadeEscopoId: number | null = !ehAdmin
+		? unidadeAtual.id
+		: unidadeFiltro
+			? Number(unidadeFiltro)
+			: null;
+
 	const where: string[] = [];
 	const binds: unknown[] = [];
+
+	if (unidadeEscopoId !== null && Number.isInteger(unidadeEscopoId)) {
+		where.push('b.unidade_id = ?');
+		binds.push(unidadeEscopoId);
+	}
 
 	if (q) {
 		const qLimpo = q.trim();
@@ -177,10 +202,11 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 					`SELECT b.id, b.categoria, b.descricao_original, b.identificador_unico,
 					        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id,
 					        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
-					        c.nome AS caixa_nome
+					        c.nome AS caixa_nome, u.nome AS unidade_nome
 					 FROM bens b
 					 JOIN procedimentos p ON p.id = b.procedimento_id
 					 LEFT JOIN caixas c ON c.id = b.caixa_id
+					 LEFT JOIN unidades u ON u.id = b.unidade_id
 					 WHERE b.procedimento_id IN (${placeholders})
 					 ${where.length ? `AND (${where.join(' AND ')})` : ''}
 					 ORDER BY p.numero_normalizado ASC, b.id ASC`
@@ -192,20 +218,29 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		}
 	}
 
+	const whereEscopoCaixas =
+		unidadeEscopoId !== null && Number.isInteger(unidadeEscopoId) ? 'WHERE c.unidade_id = ?' : '';
+	const bindsEscopo =
+		unidadeEscopoId !== null && Number.isInteger(unidadeEscopoId) ? [unidadeEscopoId] : [];
+
 	const { results: caixasRaw } = await db
 		.prepare(
-			`SELECT c.id, c.nome, c.setor,
+			`SELECT c.id, c.nome, c.setor, u.nome AS unidade_nome,
 			        COUNT(b.id) AS total_bens,
 			        SUM(CASE WHEN b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS em_deposito
 			 FROM caixas c
+			 LEFT JOIN unidades u ON u.id = c.unidade_id
 			 LEFT JOIN bens b ON b.caixa_id = c.id
+			 ${whereEscopoCaixas}
 			 GROUP BY c.id
 			 ORDER BY c.nome ASC`
 		)
+		.bind(...bindsEscopo)
 		.all<{
 			id: number;
 			nome: string;
 			setor: string | null;
+			unidade_nome: string | null;
 			total_bens: number;
 			em_deposito: number | null;
 		}>();
@@ -214,20 +249,30 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 		id: c.id,
 		nome: c.nome,
 		setor: c.setor,
+		unidade_nome: c.unidade_nome ?? null,
 		total_bens: c.total_bens ?? 0,
 		em_deposito: c.em_deposito ?? 0
 	}));
 
+	const whereEscopoProc =
+		unidadeEscopoId !== null && Number.isInteger(unidadeEscopoId) ? 'WHERE b.unidade_id = ?' : '';
+
 	const { results: procedimentos } = await db
 		.prepare(
-			`SELECT p.id, p.tipo, p.numero_normalizado, p.operacao,
+			`SELECT p.id, p.tipo, p.numero_normalizado, p.operacao, u.nome AS unidade_nome,
 			        COUNT(b.id) AS total_bens
 			 FROM procedimentos p
 			 JOIN bens b ON b.procedimento_id = p.id
+			 LEFT JOIN unidades u ON u.id = p.unidade_id
+			 ${whereEscopoProc}
 			 GROUP BY p.id
 			 ORDER BY p.numero_normalizado ASC`
 		)
+		.bind(...bindsEscopo)
 		.all<ProcedimentoDashboard>();
+
+	const whereEscopoBens =
+		unidadeEscopoId !== null && Number.isInteger(unidadeEscopoId) ? 'WHERE unidade_id = ?' : '';
 
 	const stats = await db
 		.prepare(
@@ -236,8 +281,10 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			   SUM(CASE WHEN status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS emDeposito,
 			   SUM(CASE WHEN status = 'RESTITUIDO' THEN 1 ELSE 0 END) AS restituidos,
 			   SUM(CASE WHEN caixa_id IS NULL THEN 1 ELSE 0 END) AS semCaixa
-			 FROM bens`
+			 FROM bens
+			 ${whereEscopoBens}`
 		)
+		.bind(...bindsEscopo)
 		.first<{
 			total: number;
 			emDeposito: number | null;
@@ -245,17 +292,32 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			semCaixa: number | null;
 		}>();
 
+	let unidades: UnidadeFiltroItem[] = [];
+	if (ehAdmin) {
+		const { results: unidadesRes } = await db
+			.prepare(
+				`SELECT u.id, u.nome, COUNT(b.id) AS total_bens
+				 FROM unidades u
+				 LEFT JOIN bens b ON b.unidade_id = u.id
+				 GROUP BY u.id
+				 ORDER BY CASE WHEN u.role = 'ADMIN' THEN 0 ELSE 1 END, u.nome ASC`
+			)
+			.all<UnidadeFiltroItem>();
+		unidades = unidadesRes ?? [];
+	}
+
 	return {
 		bens,
 		caixas,
 		procedimentos,
+		unidades,
 		contadores: {
 			total: stats?.total ?? 0,
 			emDeposito: stats?.emDeposito ?? 0,
 			restituidos: stats?.restituidos ?? 0,
 			semCaixa: stats?.semCaixa ?? 0
 		},
-		filtros: { q, status, caixa, procedimento },
+		filtros: { q, status, caixa, procedimento, unidade: unidadeFiltro },
 		paginacao: {
 			paginaAtual,
 			porPagina,
