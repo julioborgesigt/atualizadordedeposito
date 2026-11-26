@@ -508,7 +508,7 @@
 			type="search"
 			name="q"
 			value={data.filtros.q}
-			placeholder="Buscar por BO/IP, IMEI, placa, cartão, descrição, caixa ou operação..."
+			placeholder="Buscar por procedimento (BO, Inquérito, TCO...), IMEI, placa, cartão, descrição..."
 			aria-label="Buscar bens"
 		/>
 	</div>

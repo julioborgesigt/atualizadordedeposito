@@ -61,6 +61,83 @@ export function extrairIdentificador(
 	return { tipo: null, valor: null };
 }
 
+export function normalizarTipoProcedimento(tipoBruto: string): string {
+	const limpo = tipoBruto
+		.replace(/\./g, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.toUpperCase();
+
+	// Normaliza variações longas e sinônimos mantendo padrão claro
+	if (/^(BOLETIM(\s+DE)?\s+OCORR[EÊ]NCIA|BO)$/i.test(limpo)) return 'BO';
+	if (/^(INQU[EÉ]RITO(\s+POLICIAL)?)$/i.test(limpo)) return 'INQUÉRITO';
+	if (/^IP$/i.test(limpo)) return 'IP';
+	if (/^(TERMO\s+CIRCUNSTANCIADO(\s+DE\s+OCORR[EÊ]NCIA)?|TCO)$/i.test(limpo)) return 'TCO';
+	if (/^(BOLETIM(\s+DE\s+OCORR[EÊ]NCIA)?\s+CIRCUNSTANCIAD[AO]|BOC)$/i.test(limpo)) return 'BOC';
+	if (/^(AUTO\s+DE\s+PRIS[AÃ]O\s+EM\s+FLAGRANTE|APF)$/i.test(limpo)) return 'APF';
+	if (
+		/^(AUTO\s+DE\s+APREENS[AÃ]O\s+EM\s+FLAGRANTE\s+DE\s+ATO\s+INFRACIONAL|ATO\s+INFRACIONAL|AI|AIAI|AAFAI)$/i.test(
+			limpo
+		)
+	) {
+		return 'ATO INFRACIONAL';
+	}
+
+	return limpo;
+}
+
+export function extrairProcedimento(
+	textoBruto: string
+): { tipo: string; numero: string } | null {
+	const linhas = textoBruto
+		.split('\n')
+		.map((l) => l.trim())
+		.filter(Boolean);
+
+	for (let i = 0; i < linhas.length; i++) {
+		const linha = linhas[i];
+		const mNum = linha.match(/(\d+)[ \t]*[-–—][ \t]*(\d+)[ \t]*\/[ \t]*(\d{4})\b/);
+		if (mNum && mNum.index !== undefined) {
+			const pref = mNum[1];
+			const num = mNum[2];
+			const ano = mNum[3];
+			const numero = `${pref}-${num}/${ano}`;
+
+			const antes = linha.slice(0, mNum.index).trim();
+			let tipoCand = antes
+				.replace(/[:\s]*(?:N[º°o\.]*|N[UÚ]MERO|NO\b)[\s:]*$/i, '')
+				.trim();
+
+			if (!tipoCand && i > 0) {
+				const linhaAnt = linhas[i - 1];
+				if (
+					!/AUTO\s+DE\s+APRESENTA|TERMO\s+DE\s+RESTITUI|POLICIA\s+CIVIL|GOVERNO/i.test(linhaAnt)
+				) {
+					tipoCand = linhaAnt.replace(/[:\s]*(?:N[º°o\.]*|N[UÚ]MERO|NO\b)[\s:]*$/i, '').trim();
+				}
+			}
+
+			if (!tipoCand) {
+				tipoCand = 'PROCEDIMENTO';
+			}
+
+			const tipo = normalizarTipoProcedimento(tipoCand);
+			return { tipo, numero };
+		}
+	}
+
+	const mFallback = textoBruto.match(
+		/(?:^|\n)\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9\.\ \/-]{2,50}?)\s*(?:N[º°o\.]*|N[UÚ]MERO|NO\b)?\s*:?\s*(\d+)\s*[-–—]\s*(\d+)\s*\/\s*(\d{4})\b/i
+	);
+	if (mFallback) {
+		const tipo = normalizarTipoProcedimento(mFallback[1].trim());
+		const numero = `${mFallback[2]}-${mFallback[3]}/${mFallback[4]}`;
+		return { tipo, numero };
+	}
+
+	return null;
+}
+
 export function parseRelatorioPdf(
 	textoBruto: string,
 	nomeArquivo: string,
@@ -75,15 +152,13 @@ export function parseRelatorioPdf(
 		throw new Error(`Tipo de documento não reconhecido em "${nomeArquivo}".`);
 	}
 
-	const mProc = textoBruto.match(
-		/\b(BO|IP|I\.P\.|TCO|BOC)\s*(?:N[º°o\.]*)?\s*(\d+)\s*-\s*(\d+)\s*\/\s*(\d{4})/i
-	);
-	if (!mProc) {
+	const proc = extrairProcedimento(textoBruto);
+	if (!proc) {
 		throw new Error(`Número do procedimento não encontrado em "${nomeArquivo}".`);
 	}
 
-	const tipoProcedimento = mProc[1].replace(/\./g, '').toUpperCase() as TipoProcedimento;
-	const numeroProcedimento = `${mProc[2]}-${mProc[3]}/${mProc[4]}`;
+	const tipoProcedimento = proc.tipo;
+	const numeroProcedimento = proc.numero;
 
 	const mData = textoBruto.match(
 		/Aos\s+(\d{1,2})\s+dia\(s\)\s+do\s+m[êe]s\s+de\s+([A-Za-zÀ-ÿ]+)\s+de\s+(\d{4})/i

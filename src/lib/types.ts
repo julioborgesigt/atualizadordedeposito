@@ -1,5 +1,5 @@
 export type TipoDocumento = 'APREENSAO' | 'RESTITUICAO';
-export type TipoProcedimento = 'BO' | 'IP' | 'TCO' | 'BOC' | 'OUTRO';
+export type TipoProcedimento = string;
 export type TipoIdentificador = 'IMEI' | 'PLACA' | 'CARTAO' | 'CNPJ' | 'SERIE';
 
 export type StatusBem =
