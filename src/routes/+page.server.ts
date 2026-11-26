@@ -85,7 +85,12 @@ export const load: PageServerLoad = async ({ url, platform, locals }) => {
 	const status = url.searchParams.get('status')?.trim() ?? '';
 	const caixa = url.searchParams.get('caixa')?.trim() ?? '';
 	const procedimento = url.searchParams.get('procedimento')?.trim() ?? '';
-	const unidadeFiltro = ehAdmin ? (url.searchParams.get('unidade')?.trim() ?? '') : '';
+	const unidadeParamBruto = url.searchParams.get('unidade')?.trim();
+	const unidadeFiltro = ehAdmin
+		? unidadeParamBruto !== undefined && unidadeParamBruto !== ''
+			? unidadeParamBruto
+			: String(unidadeAtual.id)
+		: '';
 	const paginaParam = Number(url.searchParams.get('pagina') ?? '1');
 	const porPaginaParam = url.searchParams.get('porPagina')?.trim().toLowerCase() ?? '10';
 
@@ -102,9 +107,9 @@ export const load: PageServerLoad = async ({ url, platform, locals }) => {
 
 	const unidadeEscopoId: number | null = !ehAdmin
 		? unidadeAtual.id
-		: unidadeFiltro
-			? Number(unidadeFiltro)
-			: null;
+		: unidadeFiltro === 'todas'
+			? null
+			: Number(unidadeFiltro);
 
 	const where: string[] = [];
 	const binds: unknown[] = [];

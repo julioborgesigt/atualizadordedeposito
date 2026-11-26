@@ -3,6 +3,7 @@
 	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
 	import { exportarParaPdf, exportarParaXlsx, traduzirStatus } from '$lib/export/exportarBens';
 	import { tarefaStore } from '$lib/stores/tarefa.svelte';
+	import { confirmarAcao } from '$lib/stores/confirmacao.svelte';
 	import type { BemLista } from './+page.server';
 
 	let { data } = $props();
@@ -235,12 +236,84 @@
 	}
 
 	async function atualizarBem(id: number, patch: Record<string, unknown>) {
-		await fetch(`/api/bens/${id}`, {
+		const res = await fetch(`/api/bens/${id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(patch)
 		});
+		if (!res.ok) {
+			const err = (await res.json().catch(() => ({}))) as { message?: string };
+			throw new Error(err.message || 'Falha ao atualizar item.');
+		}
 		await invalidateAll();
+	}
+
+	async function confirmarTrocaCaixa(bem: BemLista, selectEl: HTMLSelectElement) {
+		const valorAnterior = bem.caixa_id ? String(bem.caixa_id) : '';
+		const novoValor = selectEl.value;
+		if (novoValor === valorAnterior) return;
+
+		const nomeDestino = novoValor
+			? (data.caixas.find((c) => String(c.id) === novoValor)?.nome ?? 'caixa selecionada')
+			: 'Sem caixa';
+		const nomeAtual = bem.caixa_nome ?? 'Sem caixa';
+
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar troca de caixa',
+			mensagem: `Deseja mover o item "${bem.descricao_original}" de "${nomeAtual}" para "${nomeDestino}"?`,
+			textoConfirmar: 'Confirmar troca'
+		});
+
+		if (!ok) {
+			selectEl.value = valorAnterior;
+			return;
+		}
+
+		tarefaStore.iniciar('Atualizando caixa do item...', bem.descricao_original);
+		try {
+			await atualizarBem(bem.id, { caixa_id: novoValor ? Number(novoValor) : null });
+			tarefaStore.concluir('Caixa atualizada!', `Item movido para "${nomeDestino}".`, {
+				autoFecharMs: 3500
+			});
+		} catch (e: unknown) {
+			selectEl.value = valorAnterior;
+			const msg = e instanceof Error ? e.message : 'Erro ao trocar caixa.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro ao trocar caixa', msg);
+		}
+	}
+
+	async function confirmarTrocaStatus(bem: BemLista, selectEl: HTMLSelectElement) {
+		const valorAnterior = bem.status;
+		const novoValor = selectEl.value;
+		if (novoValor === valorAnterior) return;
+
+		const labelAnterior = traduzirStatus(valorAnterior);
+		const labelNovo = traduzirStatus(novoValor);
+
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar alteração de status',
+			mensagem: `Deseja alterar o status do item "${bem.descricao_original}" de "${labelAnterior}" para "${labelNovo}"?`,
+			textoConfirmar: 'Confirmar status'
+		});
+
+		if (!ok) {
+			selectEl.value = valorAnterior;
+			return;
+		}
+
+		tarefaStore.iniciar('Atualizando status do item...', bem.descricao_original);
+		try {
+			await atualizarBem(bem.id, { status: novoValor });
+			tarefaStore.concluir('Status atualizado!', `Novo status: "${labelNovo}".`, {
+				autoFecharMs: 3500
+			});
+		} catch (e: unknown) {
+			selectEl.value = valorAnterior;
+			const msg = e instanceof Error ? e.message : 'Erro ao alterar status.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro ao alterar status', msg);
+		}
 	}
 
 	async function moverSelecionadosParaCaixa() {
@@ -254,8 +327,23 @@
 			return;
 		}
 
+		const nomeDestino =
+			destinoLoteCaixa === '__NOVA__'
+				? `nova caixa "${nomeNovaCaixaLote.trim()}"`
+				: destinoLoteCaixa === '__SEM_CAIXA__'
+					? 'Sem caixa'
+					: `"${data.caixas.find((c) => String(c.id) === destinoLoteCaixa)?.nome ?? 'caixa selecionada'}"`;
+
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar movimentação em lote',
+			mensagem: `Deseja mover ${selecionados.length} item(ns) selecionado(s) para ${nomeDestino}?`,
+			textoConfirmar: 'Confirmar movimentação'
+		});
+		if (!ok) return;
+
 		processandoLote = true;
 		feedback = null;
+		tarefaStore.iniciar('Movendo itens em lote...', `${selecionados.length} item(ns) selecionado(s).`);
 		try {
 			const payload: Record<string, unknown> = { ids: selecionados };
 			if (destinoLoteCaixa === '__NOVA__') {
@@ -282,12 +370,14 @@
 			destinoLoteCaixa = '';
 			nomeNovaCaixaLote = '';
 			feedback = { tipo: 'ok', texto: `${qtd} item(ns) movido(s) de caixa com sucesso.` };
+			tarefaStore.concluir('Movimentação concluída!', `${qtd} item(ns) movido(s) para ${nomeDestino}.`, {
+				autoFecharMs: 4000
+			});
 			await invalidateAll();
 		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao mover itens.'
-			};
+			const msg = e instanceof Error ? e.message : 'Erro ao mover itens.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro ao mover itens', msg);
 		} finally {
 			processandoLote = false;
 		}
@@ -295,8 +385,18 @@
 
 	async function alterarStatusEmLote() {
 		if (selecionados.length === 0 || !statusLote) return;
+
+		const labelNovo = traduzirStatus(statusLote);
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar alteração de status em lote',
+			mensagem: `Deseja alterar o status de ${selecionados.length} item(ns) selecionado(s) para "${labelNovo}"?`,
+			textoConfirmar: 'Aplicar status'
+		});
+		if (!ok) return;
+
 		processandoLote = true;
 		feedback = null;
+		tarefaStore.iniciar('Alterando status em lote...', `${selecionados.length} item(ns) para "${labelNovo}".`);
 		try {
 			const res = await fetch('/api/bens/lote', {
 				method: 'PATCH',
@@ -309,12 +409,14 @@
 			selecionados = [];
 			statusLote = '';
 			feedback = { tipo: 'ok', texto: `Status atualizado para ${qtd} item(ns).` };
+			tarefaStore.concluir('Status atualizado em lote!', `${qtd} item(ns) alterado(s) para "${labelNovo}".`, {
+				autoFecharMs: 4000
+			});
 			await invalidateAll();
 		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao atualizar status.'
-			};
+			const msg = e instanceof Error ? e.message : 'Erro ao atualizar status.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro ao atualizar status', msg);
 		} finally {
 			processandoLote = false;
 		}
@@ -322,13 +424,17 @@
 
 	async function excluirItens(idsParaExcluir: number[]) {
 		if (idsParaExcluir.length === 0) return;
-		const confirmar = confirm(
-			`Confirma a exclusão de ${idsParaExcluir.length} item(ns) selecionado(s)? Esta ação não pode ser desfeita.`
-		);
+		const confirmar = await confirmarAcao({
+			titulo: 'Confirmar exclusão',
+			mensagem: `Confirma a exclusão de ${idsParaExcluir.length} item(ns) selecionado(s)? Esta ação não pode ser desfeita.`,
+			textoConfirmar: 'Excluir',
+			perigoso: true
+		});
 		if (!confirmar) return;
 
 		processandoLote = true;
 		feedback = null;
+		tarefaStore.iniciar('Excluindo itens...', `${idsParaExcluir.length} item(ns).`);
 		try {
 			const res = await fetch('/api/bens/lote', {
 				method: 'DELETE',
@@ -342,12 +448,14 @@
 				tipo: 'ok',
 				texto: `${idsParaExcluir.length} item(ns) excluído(s) com sucesso.`
 			};
+			tarefaStore.concluir('Exclusão concluída!', `${idsParaExcluir.length} item(ns) excluído(s).`, {
+				autoFecharMs: 4000
+			});
 			await invalidateAll();
 		} catch (e: unknown) {
-			feedback = {
-				tipo: 'erro',
-				texto: e instanceof Error ? e.message : 'Erro ao excluir itens.'
-			};
+			const msg = e instanceof Error ? e.message : 'Erro ao excluir itens.';
+			feedback = { tipo: 'erro', texto: msg };
+			tarefaStore.falhar('Erro ao excluir itens', msg);
 		} finally {
 			processandoLote = false;
 		}
@@ -550,7 +658,7 @@
 			aria-label="Filtrar por unidade"
 			onchange={(e) => filtrarPorUnidade(e.currentTarget.value)}
 		>
-			<option value="">Todas as unidades</option>
+			<option value="todas">Todas as unidades</option>
 			{#each data.unidades as u}
 				<option value={String(u.id)}>{u.nome} ({u.total_bens})</option>
 			{/each}
@@ -586,7 +694,7 @@
 	/>
 	<div class="f-acoes">
 		<button type="submit" class="btn btn-dark">Filtrar</button>
-		{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento || data.filtros.unidade}
+		{#if data.filtros.q || data.filtros.status || data.filtros.caixa || data.filtros.procedimento || (data.unidade?.role === 'ADMIN' && data.filtros.unidade !== String(data.unidade.id))}
 			<a
 				href={data.paginacao.porPaginaOpcao && data.paginacao.porPaginaOpcao !== '10'
 					? `/?porPagina=${data.paginacao.porPaginaOpcao}`
@@ -830,10 +938,7 @@
 												class="row-select"
 												value={bem.caixa_id ? String(bem.caixa_id) : ''}
 												aria-label="Caixa do item"
-												onchange={(e) =>
-													atualizarBem(bem.id, {
-														caixa_id: e.currentTarget.value ? Number(e.currentTarget.value) : null
-													})}
+												onchange={(e) => confirmarTrocaCaixa(bem, e.currentTarget)}
 											>
 												<option value="">Sem caixa</option>
 												{#each data.caixas as cx}
@@ -846,7 +951,7 @@
 												class="row-select status-select {bem.status.toLowerCase()}"
 												value={bem.status}
 												aria-label="Status do item"
-												onchange={(e) => atualizarBem(bem.id, { status: e.currentTarget.value })}
+												onchange={(e) => confirmarTrocaStatus(bem, e.currentTarget)}
 											>
 												{#each STATUS_OPCOES as st}
 													<option value={st.value}>{st.label}</option>

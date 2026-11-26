@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { tarefaStore } from '$lib/stores/tarefa.svelte';
+	import { confirmarAcao } from '$lib/stores/confirmacao.svelte';
 	import type { UnidadeAdminItem } from './+page.server';
 
 	let { data } = $props();
@@ -22,6 +23,13 @@
 	async function cadastrarUnidade(e: SubmitEvent) {
 		e.preventDefault();
 		if (cadastrando) return;
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar cadastro de unidade',
+			mensagem: `Deseja cadastrar a unidade "${nome.trim()}" com o e-mail "${email.trim()}"?`,
+			textoConfirmar: 'Cadastrar unidade'
+		});
+		if (!ok) return;
+
 		erroCadastro = null;
 		cadastrando = true;
 		tarefaStore.iniciar('Cadastrando nova unidade...', nome.trim());
@@ -110,6 +118,16 @@
 	async function alternarStatus(u: UnidadeAdminItem) {
 		if (processandoId !== null) return;
 		const novoAtivo = u.ativo !== 1;
+		const ok = await confirmarAcao({
+			titulo: novoAtivo ? 'Reativar unidade' : 'Desativar unidade',
+			mensagem: novoAtivo
+				? `Deseja reativar o acesso da unidade "${u.nome}"?`
+				: `Deseja desativar o acesso da unidade "${u.nome}"? As sessões ativas serão encerradas imediatamente.`,
+			textoConfirmar: novoAtivo ? 'Reativar' : 'Desativar',
+			perigoso: !novoAtivo
+		});
+		if (!ok) return;
+
 		processandoId = u.id;
 		tarefaStore.iniciar(
 			novoAtivo ? 'Ativando unidade...' : 'Desativando unidade...',

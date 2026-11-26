@@ -5,6 +5,7 @@
 	import type { DocumentoParseado, PreviewDocumento } from '$lib/types';
 	import CaixaSelect from '$lib/components/CaixaSelect.svelte';
 	import { tarefaStore } from '$lib/stores/tarefa.svelte';
+	import { confirmarAcao } from '$lib/stores/confirmacao.svelte';
 
 	let { data } = $props();
 
@@ -133,11 +134,19 @@
 			tarefaStore.falhar('Caixa de destino não definida', erro);
 			return;
 		}
+		const totalDocs = previewDocs.filter((d) => !d.jaImportado).length;
+		const destinoTexto = caixaFinal ? `na caixa "${caixaFinal}"` : 'sem vínculo de caixa';
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar importação',
+			mensagem: `Deseja salvar ${totalDocs} documento(s) ${destinoTexto} no banco de dados?`,
+			textoConfirmar: 'Confirmar e salvar'
+		});
+		if (!ok) return;
+
 		salvando = true;
 		erro = null;
 		mensagemSucesso = null;
 
-		const totalDocs = previewDocs.filter((d) => !d.jaImportado).length;
 		tarefaStore.iniciar(
 			'Salvando importação no banco...',
 			caixaFinal

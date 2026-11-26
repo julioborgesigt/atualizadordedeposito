@@ -22,9 +22,12 @@ export const GET: RequestHandler = async ({ url, platform, locals }) => {
 	if (unidade.role !== 'ADMIN') {
 		where.push('b.unidade_id = ?');
 		binds.push(unidade.id);
-	} else if (unidadeFiltro) {
-		where.push('b.unidade_id = ?');
-		binds.push(Number(unidadeFiltro));
+	} else if (unidadeFiltro !== 'todas') {
+		const idAlvo = unidadeFiltro ? Number(unidadeFiltro) : unidade.id;
+		if (Number.isInteger(idAlvo) && idAlvo > 0) {
+			where.push('b.unidade_id = ?');
+			binds.push(idAlvo);
+		}
 	}
 
 	if (q) {

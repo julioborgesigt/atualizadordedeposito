@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { confirmarAcao } from '$lib/stores/confirmacao.svelte';
 
 	let { data } = $props();
 
@@ -75,6 +76,12 @@
 	async function criarNovaCaixa() {
 		const nome = novaCaixaNome.trim();
 		if (!nome) return;
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar criação de caixa',
+			mensagem: `Deseja criar a nova caixa "${nome}"?`,
+			textoConfirmar: 'Criar caixa'
+		});
+		if (!ok) return;
 		feedback = null;
 		try {
 			const res = await fetch('/api/caixas', {
@@ -100,6 +107,12 @@
 	async function salvarRenomearCaixa(id: number) {
 		const nome = editandoCaixaNome.trim();
 		if (!nome) return;
+		const ok = await confirmarAcao({
+			titulo: 'Confirmar renomeação',
+			mensagem: `Deseja alterar o nome da caixa para "${nome}"?`,
+			textoConfirmar: 'Salvar nome'
+		});
+		if (!ok) return;
 		feedback = null;
 		try {
 			const res = await fetch('/api/caixas', {
@@ -135,7 +148,13 @@
 				? `Confirma excluir a caixa "${nome}"? Os ${totalBens} bem(ns) serão mantidos no sistema como "Sem caixa".`
 				: `Confirma excluir a caixa vazia "${nome}"?`;
 
-		if (!confirm(msg)) return;
+		const ok = await confirmarAcao({
+			titulo: excluirBensJunto ? 'Excluir caixa e bens' : 'Confirmar exclusão de caixa',
+			mensagem: msg,
+			textoConfirmar: 'Excluir',
+			perigoso: true
+		});
+		if (!ok) return;
 
 		feedback = null;
 		try {
@@ -173,7 +192,13 @@
 				? `Confirma a exclusão da apreensão "${procLabel}" (${nomeArquivo}) e de seus ${qtdBens} bem(ns)? O PDF poderá ser importado novamente depois.`
 				: `Confirma a exclusão do termo de restituição "${procLabel}" (${nomeArquivo})? Os bens restituídos por ele voltarão ao status "Em depósito".`;
 
-		if (!confirm(msg)) return;
+		const ok = await confirmarAcao({
+			titulo: `Excluir documento de ${labelTipo}`,
+			mensagem: msg,
+			textoConfirmar: 'Excluir documento',
+			perigoso: true
+		});
+		if (!ok) return;
 
 		feedback = null;
 		try {

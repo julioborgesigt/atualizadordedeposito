@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
 	import IndicadorTarefa from '$lib/components/IndicadorTarefa.svelte';
+	import ModalConfirmacao from '$lib/components/ModalConfirmacao.svelte';
+	import { confirmarAcao } from '$lib/stores/confirmacao.svelte';
 
 	let { data, children } = $props();
 
@@ -37,6 +39,12 @@
 
 	async function sair() {
 		if (saindo) return;
+		const ok = await confirmarAcao({
+			titulo: 'Encerrar sessão',
+			mensagem: 'Deseja realmente sair do sistema Custódia PCCE?',
+			textoConfirmar: 'Sair'
+		});
+		if (!ok) return;
 		saindo = true;
 		try {
 			await fetch('/api/auth/logout', { method: 'POST' });
@@ -137,6 +145,7 @@
 	</main>
 
 	<IndicadorTarefa />
+	<ModalConfirmacao />
 </div>
 
 <style>
