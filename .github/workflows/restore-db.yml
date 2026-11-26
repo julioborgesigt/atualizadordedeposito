@@ -31,4 +31,4 @@ jobs:
           if [ -n "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
             export CLOUDFLARE_ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
           fi
-          npx wrangler d1 time-travel restore custodia-pcce-db --timestamp="${{ github.event.inputs.timestamp }}" --yes
+          yes | npx wrangler d1 time-travel restore custodia-pcce-db --timestamp="${{ github.event.inputs.timestamp }}"
