@@ -17,13 +17,79 @@
 
 	let selecionados = $state<number[]>([]);
 	let processandoLote = $state(false);
-	let exportando = $state<'XLSX' | 'PDF' | null>(null);
+	let exportando = $state<'XLSX' | 'PDF' | 'PDF_SELECIONADOS' | null>(null);
 	let feedback = $state<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+
+	// Controle de procedimentos expandidos (recolhidos por padrão)
+	let procedimentosExpandidos = $state<Record<string, boolean>>({});
 
 	// Estados da barra de ação em lote
 	let destinoLoteCaixa = $state<string>('');
 	let nomeNovaCaixaLote = $state('');
 	let statusLote = $state('');
+
+	interface GrupoProcedimento {
+		chave: string;
+		proc_tipo: string;
+		proc_numero: string;
+		operacao: string | null;
+		itens: BemLista[];
+		totalItens: number;
+		emDeposito: number;
+		restituidos: number;
+	}
+
+	const gruposPorProcedimento = $derived.by(() => {
+		const mapa = new Map<string, GrupoProcedimento>();
+		for (const bem of data.bens) {
+			const chave = `${bem.proc_tipo} ${bem.proc_numero}`;
+			let grupo = mapa.get(chave);
+			if (!grupo) {
+				grupo = {
+					chave,
+					proc_tipo: bem.proc_tipo,
+					proc_numero: bem.proc_numero,
+					operacao: bem.operacao,
+					itens: [],
+					totalItens: 0,
+					emDeposito: 0,
+					restituidos: 0
+				};
+				mapa.set(chave, grupo);
+			}
+			grupo.itens.push(bem);
+			grupo.totalItens += 1;
+			if (bem.status === 'EM_DEPOSITO' || bem.status === 'RESTITUIDO_PARCIAL') {
+				grupo.emDeposito += 1;
+			} else if (bem.status === 'RESTITUIDO') {
+				grupo.restituidos += 1;
+			}
+		}
+		return Array.from(mapa.values());
+	});
+
+	function alternarExpansao(chave: string) {
+		procedimentosExpandidos[chave] = !procedimentosExpandidos[chave];
+	}
+
+	function alternarGrupo(grupo: GrupoProcedimento, marcar: boolean) {
+		const idsGrupo = grupo.itens.map((b) => b.id);
+		if (marcar) {
+			const novos = idsGrupo.filter((id) => !selecionados.includes(id));
+			selecionados = [...selecionados, ...novos];
+		} else {
+			selecionados = selecionados.filter((id) => !idsGrupo.includes(id));
+		}
+	}
+
+	function grupoTodoSelecionado(grupo: GrupoProcedimento): boolean {
+		return grupo.itens.length > 0 && grupo.itens.every((b) => selecionados.includes(b.id));
+	}
+
+	function grupoParcialmenteSelecionado(grupo: GrupoProcedimento): boolean {
+		const temMarcado = grupo.itens.some((b) => selecionados.includes(b.id));
+		return temMarcado && !grupoTodoSelecionado(grupo);
+	}
 
 	const opcoesFiltroCaixa = $derived([
 		{ value: '', label: `Todas as caixas (${data.contadores.total})` },
@@ -299,6 +365,54 @@
 			exportando = null;
 		}
 	}
+
+	async function exportarPdfSelecionados() {
+		if (exportando || selecionados.length === 0) return;
+		exportando = 'PDF_SELECIONADOS';
+		feedback = null;
+
+		try {
+			// Filtra os itens selecionados presentes na página carregada
+			let itensParaExportar = data.bens.filter((b) => selecionados.includes(b.id));
+
+			// Se algum selecionado não estiver na página atual, busca do servidor
+			if (itensParaExportar.length < selecionados.length) {
+				const params = new URLSearchParams();
+				if (data.filtros.q) params.set('q', data.filtros.q);
+				if (data.filtros.status) params.set('status', data.filtros.status);
+				if (data.filtros.caixa) params.set('caixa', data.filtros.caixa);
+				if (data.filtros.procedimento) params.set('procedimento', data.filtros.procedimento);
+				const qs = params.toString();
+				const res = await fetch(qs ? `/api/bens/exportar?${qs}` : '/api/bens/exportar');
+				if (res.ok) {
+					const { bens } = (await res.json()) as { bens: BemLista[] };
+					itensParaExportar = (bens || []).filter((b) => selecionados.includes(b.id));
+				}
+			}
+
+			if (itensParaExportar.length === 0) {
+				feedback = { tipo: 'erro', texto: 'Nenhum dos itens selecionados foi encontrado para gerar o PDF.' };
+				return;
+			}
+
+			const contexto = {
+				caixaLabel: caixaVisualizadaLabel,
+				procedimentoLabel: `${selecionados.length} item(ns) selecionado(s)`,
+				statusLabel: data.filtros.status ? traduzirStatus(data.filtros.status) : '',
+				termoBusca: data.filtros.q,
+				tituloRelatorio: 'CUSTÓDIA PCCE — RELATÓRIO DE BENS SELECIONADOS'
+			};
+
+			await exportarParaPdf(itensParaExportar, contexto);
+		} catch (e: unknown) {
+			feedback = {
+				tipo: 'erro',
+				texto: e instanceof Error ? e.message : 'Erro ao gerar PDF dos itens selecionados.'
+			};
+		} finally {
+			exportando = null;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -461,6 +575,19 @@
 
 			<button
 				type="button"
+				class="btn btn-secondary btn-sm bulk-pdf-btn"
+				disabled={processandoLote || exportando !== null}
+				onclick={exportarPdfSelecionados}
+				title="Baixar relatório em PDF contendo apenas os itens selecionados"
+			>
+				<span class="file-chip pdf" aria-hidden="true">PDF</span>
+				{exportando === 'PDF_SELECIONADOS' ? 'Gerando...' : `Baixar PDF Selecionados (${selecionados.length})`}
+			</button>
+
+			<span class="bulk-sep">ou</span>
+
+			<button
+				type="button"
 				class="btn btn-danger-solid btn-sm bulk-del"
 				disabled={processandoLote}
 				onclick={() => excluirItens(selecionados)}
@@ -514,113 +641,172 @@
 	</div>
 </section>
 
-{#if data.bens.length > 0}
-	<label class="select-all-mobile">
-		<input
-			type="checkbox"
-			checked={todosSelecionados}
-			onchange={(e) => alternarTodos(e.currentTarget.checked)}
-		/>
-		Selecionar todos desta página
-	</label>
-{/if}
+<div class="grupos-procedimentos">
+	{#if data.bens.length === 0}
+		<div class="empty-panel panel">
+			<strong>Nenhum bem encontrado para este filtro.</strong>
+			<p><a href="/importar">Importar lote de PDFs</a></p>
+		</div>
+	{/if}
 
-<div class="table-wrap cards">
-	<table class="table bens-table">
-		<thead>
-			<tr>
-				<th class="c-check">
-					<input
-						type="checkbox"
-						checked={todosSelecionados}
-						onchange={(e) => alternarTodos(e.currentTarget.checked)}
-						title="Selecionar todos desta página"
-						aria-label="Selecionar todos desta página"
-					/>
-				</th>
-				<th>Procedimento</th>
-				<th>Bem / Descrição</th>
-				<th>Saldo</th>
-				<th>Caixa</th>
-				<th>Status</th>
-				<th class="c-acoes"><span class="sr-only">Ações</span></th>
-			</tr>
-		</thead>
-		<tbody>
-			{#if data.bens.length === 0}
-				<tr class="row-empty">
-					<td colspan="7" class="empty">
-						<strong>Nenhum bem encontrado para este filtro.</strong><br />
-						<a href="/importar">Importar lote de PDFs</a>
-					</td>
-				</tr>
-			{/if}
-			{#each data.bens as bem (bem.id)}
-				<tr class:row-selected={selecionados.includes(bem.id)}>
-					<td class="c-check">
+	{#each gruposPorProcedimento as grupo (grupo.chave)}
+		{@const expandido = !!procedimentosExpandidos[grupo.chave]}
+		{@const todoMarcado = grupoTodoSelecionado(grupo)}
+		{@const parteMarcado = grupoParcialmenteSelecionado(grupo)}
+
+		<section class="proc-card panel" class:expandido>
+			<header class="proc-card-header">
+				<div class="proc-header-left">
+					<label class="proc-select-wrap" title="Selecionar todos os bens deste procedimento">
 						<input
 							type="checkbox"
-							checked={selecionados.includes(bem.id)}
-							onchange={(e) => alternarItem(bem.id, e.currentTarget.checked)}
-							aria-label="Selecionar item"
+							checked={todoMarcado}
+							indeterminate={parteMarcado}
+							onchange={(e) => alternarGrupo(grupo, e.currentTarget.checked)}
+							aria-label="Selecionar todos os itens de {grupo.proc_tipo} {grupo.proc_numero}"
 						/>
-					</td>
-					<td class="c-proc">
-						<strong class="proc">{bem.proc_tipo} {bem.proc_numero}</strong>
-						{#if bem.operacao}
-							<div class="muted">{bem.operacao}</div>
+					</label>
+
+					<button
+						type="button"
+						class="proc-toggle-btn"
+						onclick={() => alternarExpansao(grupo.chave)}
+						aria-expanded={expandido}
+					>
+						<span class="chevron-icon" class:open={expandido} aria-hidden="true">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+								<path d="m9 18 6-6-6-6" />
+							</svg>
+						</span>
+
+						<div class="proc-titulos">
+							<div class="proc-identificacao">
+								<span class="proc-tipo-badge">{grupo.proc_tipo}</span>
+								<strong class="proc-numero">{grupo.proc_numero}</strong>
+								{#if grupo.operacao}
+									<span class="proc-operacao">• {grupo.operacao}</span>
+								{/if}
+							</div>
+							<span class="proc-sub">
+								{expandido ? 'Clique para recolher os itens' : 'Clique para exibir os itens apreendidos'}
+							</span>
+						</div>
+					</button>
+				</div>
+
+				<div class="proc-header-right">
+					<div class="proc-resumo-badges">
+						<span class="badge slate">{grupo.totalItens} {grupo.totalItens === 1 ? 'bem' : 'bens'}</span>
+						{#if grupo.emDeposito > 0}
+							<span class="badge amber">{grupo.emDeposito} em depósito</span>
 						{/if}
-					</td>
-					<td class="c-desc">
-						<div class="cat">{bem.categoria}</div>
-						<div class="desc">{bem.descricao_original}</div>
-					</td>
-					<td class="c-saldo" data-label="Saldo">
-						<span class="saldo"><strong>{bem.qtd_disponivel}</strong> / {bem.qtd_total} {bem.unidade}</span>
-					</td>
-					<td class="c-caixa" data-label="Caixa">
-						<select
-							class="row-select"
-							value={bem.caixa_id ? String(bem.caixa_id) : ''}
-							aria-label="Caixa do item"
-							onchange={(e) =>
-								atualizarBem(bem.id, {
-									caixa_id: e.currentTarget.value ? Number(e.currentTarget.value) : null
-								})}
-						>
-							<option value="">Sem caixa</option>
-							{#each data.caixas as cx}
-								<option value={String(cx.id)}>{cx.nome}</option>
-							{/each}
-						</select>
-					</td>
-					<td class="c-status" data-label="Status">
-						<select
-							class="row-select status-select {bem.status.toLowerCase()}"
-							value={bem.status}
-							aria-label="Status do item"
-							onchange={(e) => atualizarBem(bem.id, { status: e.currentTarget.value })}
-						>
-							{#each STATUS_OPCOES as st}
-								<option value={st.value}>{st.label}</option>
-							{/each}
-						</select>
-					</td>
-					<td class="c-acoes">
-						<button
-							type="button"
-							class="btn btn-danger btn-sm btn-icon"
-							title="Excluir este item"
-							aria-label="Excluir este item"
-							onclick={() => excluirItens([bem.id])}
-						>
-							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
-						</button>
-					</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
+						{#if grupo.restituidos > 0}
+							<span class="badge green">{grupo.restituidos} restituído(s)</span>
+						{/if}
+					</div>
+
+					<button
+						type="button"
+						class="btn btn-secondary btn-sm toggle-action-btn"
+						onclick={() => alternarExpansao(grupo.chave)}
+					>
+						{expandido ? 'Recolher' : 'Exibir itens'}
+					</button>
+				</div>
+			</header>
+
+			{#if expandido}
+				<div class="proc-itens-wrap">
+					<div class="table-wrap cards">
+						<table class="table bens-table">
+							<thead>
+								<tr>
+									<th class="c-check">
+										<input
+											type="checkbox"
+											checked={todoMarcado}
+											indeterminate={parteMarcado}
+											onchange={(e) => alternarGrupo(grupo, e.currentTarget.checked)}
+											title="Selecionar todos deste procedimento"
+											aria-label="Selecionar todos deste procedimento"
+										/>
+									</th>
+									<th>Bem / Descrição</th>
+									<th>Saldo</th>
+									<th>Caixa</th>
+									<th>Status</th>
+									<th class="c-acoes"><span class="sr-only">Ações</span></th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each grupo.itens as bem (bem.id)}
+									<tr class:row-selected={selecionados.includes(bem.id)}>
+										<td class="c-check">
+											<input
+												type="checkbox"
+												checked={selecionados.includes(bem.id)}
+												onchange={(e) => alternarItem(bem.id, e.currentTarget.checked)}
+												aria-label="Selecionar item"
+											/>
+										</td>
+										<td class="c-desc">
+											<div class="cat">{bem.categoria}</div>
+											<div class="desc">{bem.descricao_original}</div>
+											{#if bem.identificador_unico}
+												<div class="muted">ID: {bem.identificador_unico}</div>
+											{/if}
+										</td>
+										<td class="c-saldo" data-label="Saldo">
+											<span class="saldo"><strong>{bem.qtd_disponivel}</strong> / {bem.qtd_total} {bem.unidade}</span>
+										</td>
+										<td class="c-caixa" data-label="Caixa">
+											<select
+												class="row-select"
+												value={bem.caixa_id ? String(bem.caixa_id) : ''}
+												aria-label="Caixa do item"
+												onchange={(e) =>
+													atualizarBem(bem.id, {
+														caixa_id: e.currentTarget.value ? Number(e.currentTarget.value) : null
+													})}
+											>
+												<option value="">Sem caixa</option>
+												{#each data.caixas as cx}
+													<option value={String(cx.id)}>{cx.nome}</option>
+												{/each}
+											</select>
+										</td>
+										<td class="c-status" data-label="Status">
+											<select
+												class="row-select status-select {bem.status.toLowerCase()}"
+												value={bem.status}
+												aria-label="Status do item"
+												onchange={(e) => atualizarBem(bem.id, { status: e.currentTarget.value })}
+											>
+												{#each STATUS_OPCOES as st}
+													<option value={st.value}>{st.label}</option>
+												{/each}
+											</select>
+										</td>
+										<td class="c-acoes">
+											<button
+												type="button"
+												class="btn btn-danger btn-sm btn-icon"
+												title="Excluir este item"
+												aria-label="Excluir este item"
+												onclick={() => excluirItens([bem.id])}
+											>
+												<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{/if}
+		</section>
+	{/each}
 </div>
 
 {#if data.paginacao.totalPaginas > 1}
@@ -932,10 +1118,156 @@
 		background: hsl(354 70% 46%);
 	}
 
-	/* Tabela de bens */
-	.select-all-mobile {
-		display: none;
+	.bulk-pdf-btn {
+		font-weight: 700;
 	}
+
+	/* Grupos por procedimento */
+	.grupos-procedimentos {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-bottom: 0.85rem;
+	}
+	.empty-panel {
+		text-align: center;
+		padding: 2.5rem 1rem;
+		color: var(--text-2);
+	}
+	.proc-card {
+		padding: 0;
+		overflow: hidden;
+		transition: border-color 0.15s, box-shadow 0.15s;
+	}
+	.proc-card.expandido {
+		border-color: var(--primary-soft-2);
+		box-shadow: var(--shadow);
+	}
+	.proc-card-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem 1rem;
+		flex-wrap: wrap;
+		padding: 0.85rem 1.1rem;
+		background: var(--surface);
+		transition: background 0.12s;
+	}
+	.proc-card.expandido .proc-card-header {
+		background: var(--surface-2);
+		border-bottom: 1px solid var(--border);
+	}
+	.proc-header-left {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		min-width: 0;
+		flex: 1 1 auto;
+	}
+	.proc-select-wrap {
+		display: inline-flex;
+		align-items: center;
+		cursor: pointer;
+		padding: 0.2rem;
+	}
+	.proc-toggle-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		background: transparent;
+		border: none;
+		padding: 0.25rem 0;
+		cursor: pointer;
+		text-align: left;
+		min-width: 0;
+		flex: 1;
+		color: inherit;
+	}
+	.chevron-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		flex-shrink: 0;
+		border-radius: var(--radius-sm);
+		background: var(--surface-3);
+		color: var(--text-2);
+		transition: transform 0.18s ease, background 0.12s, color 0.12s;
+	}
+	.chevron-icon.open {
+		transform: rotate(90deg);
+		background: var(--primary-soft);
+		color: var(--primary);
+	}
+	.proc-titulos {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		min-width: 0;
+	}
+	.proc-identificacao {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		flex-wrap: wrap;
+	}
+	.proc-tipo-badge {
+		display: inline-block;
+		padding: 0.12rem 0.45rem;
+		border-radius: 4px;
+		background: var(--surface-3);
+		color: var(--text-2);
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+	}
+	.proc-numero {
+		font-size: 1.02rem;
+		font-weight: 700;
+		color: var(--text);
+	}
+	.proc-operacao {
+		font-size: 0.85rem;
+		color: var(--text-3);
+		font-weight: 500;
+	}
+	.proc-sub {
+		font-size: 0.78rem;
+		color: var(--text-3);
+	}
+	.proc-header-right {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		flex-shrink: 0;
+	}
+	.proc-resumo-badges {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+	.toggle-action-btn {
+		font-weight: 600;
+	}
+	.proc-itens-wrap {
+		padding: 0.85rem 1rem 1rem;
+		background: var(--surface);
+		animation: itens-in 0.16s ease-out;
+	}
+	@keyframes itens-in {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	/* Tabela de bens dentro do procedimento */
 	.bens-table th.c-check,
 	.bens-table td.c-check {
 		width: 44px;
@@ -955,10 +1287,6 @@
 	.bens-table tr.row-selected,
 	.bens-table tr.row-selected:hover {
 		background: var(--primary-soft);
-	}
-	.proc {
-		font-weight: 600;
-		white-space: nowrap;
 	}
 	.cat {
 		font-size: 0.68rem;
@@ -1130,13 +1458,22 @@
 			color: var(--text-2);
 		}
 
+		.proc-card-header {
+			padding: 0.75rem 0.85rem;
+		}
+		.proc-header-right .toggle-action-btn {
+			display: none;
+		}
+		.proc-itens-wrap {
+			padding: 0.5rem 0.65rem 0.75rem;
+		}
+
 		/* Card do bem */
 		.bens-table tr:not(.row-empty) {
 			display: grid !important;
 			grid-template-columns: auto 1fr auto;
 			grid-template-areas:
-				'check proc acoes'
-				'desc desc desc'
+				'check desc acoes'
 				'saldo saldo saldo'
 				'caixa caixa status';
 			column-gap: 0.65rem;
@@ -1147,10 +1484,6 @@
 			width: auto;
 			padding: 0.1rem 0 0;
 		}
-		.bens-table td.c-proc {
-			grid-area: proc;
-			padding-top: 0;
-		}
 		.bens-table td.c-acoes {
 			grid-area: acoes;
 			width: auto;
@@ -1158,9 +1491,7 @@
 		}
 		.bens-table td.c-desc {
 			grid-area: desc;
-			padding: 0.5rem 0 0.35rem;
-			border-top: 1px solid var(--border) !important;
-			margin-top: 0.3rem;
+			padding: 0 0 0.35rem;
 		}
 		.bens-table td.c-saldo {
 			grid-area: saldo;
@@ -1198,8 +1529,7 @@
 	@media (max-width: 400px) {
 		.bens-table tr:not(.row-empty) {
 			grid-template-areas:
-				'check proc acoes'
-				'desc desc desc'
+				'check desc acoes'
 				'saldo saldo saldo'
 				'caixa caixa caixa'
 				'status status status';

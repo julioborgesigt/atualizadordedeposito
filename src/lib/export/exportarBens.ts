@@ -5,6 +5,7 @@ export interface ContextoExportacao {
 	procedimentoLabel: string;
 	statusLabel: string;
 	termoBusca: string;
+	tituloRelatorio?: string;
 }
 
 const MAPA_STATUS: Record<string, string> = {
@@ -98,7 +99,11 @@ export async function exportarParaPdf(
 	doc.setFont('helvetica', 'bold');
 	doc.setFontSize(13);
 	doc.setTextColor(15, 23, 42);
-	doc.text('CUSTÓDIA PCCE — RELATÓRIO DE BENS APREENDIDOS E RESTITUIÇÕES', 14, 14);
+	doc.text(
+		contexto.tituloRelatorio || 'CUSTÓDIA PCCE — RELATÓRIO DE BENS APREENDIDOS E RESTITUIÇÕES',
+		14,
+		14
+	);
 
 	doc.setFont('helvetica', 'normal');
 	doc.setFontSize(9.5);

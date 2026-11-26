@@ -117,7 +117,7 @@ export const load: PageServerLoad = async ({ url, platform }) => {
 			 JOIN procedimentos p ON p.id = b.procedimento_id
 			 LEFT JOIN caixas c ON c.id = b.caixa_id
 			 ${whereSql}
-			 ORDER BY b.atualizado_em DESC, b.id DESC
+			 ORDER BY p.numero_normalizado ASC, b.id ASC
 			 LIMIT ? OFFSET ?`
 		)
 		.bind(...binds, POR_PAGINA, offset)
