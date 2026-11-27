@@ -19,6 +19,7 @@ export interface BemLista {
 	proc_numero: string;
 	operacao: string | null;
 	caixa_nome: string | null;
+	observacoes?: string | null;
 	unidade_nome?: string | null;
 }
 
@@ -189,7 +190,7 @@ export const load: PageServerLoad = async ({ url, platform, locals }) => {
 			const { results: bensResult } = await db
 				.prepare(
 					`SELECT b.id, b.categoria, b.descricao_original, b.identificador_unico,
-					        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id,
+					        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id, b.observacoes,
 					        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
 					        c.nome AS caixa_nome, u.nome AS unidade_nome
 					 FROM bens b
@@ -216,7 +217,7 @@ export const load: PageServerLoad = async ({ url, platform, locals }) => {
 		.prepare(
 			`SELECT c.id, c.nome, c.setor, u.nome AS unidade_nome,
 			        COUNT(b.id) AS total_bens,
-			        SUM(CASE WHEN b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS em_deposito
+			        SUM(CASE WHEN b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'PERICIA_PARCIAL', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS em_deposito
 			 FROM caixas c
 			 LEFT JOIN unidades u ON u.id = c.unidade_id
 			 LEFT JOIN bens b ON b.caixa_id = c.id
@@ -267,7 +268,7 @@ export const load: PageServerLoad = async ({ url, platform, locals }) => {
 		.prepare(
 			`SELECT
 			   COUNT(*) AS total,
-			   SUM(CASE WHEN status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS emDeposito,
+			   SUM(CASE WHEN status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'PERICIA_PARCIAL', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS emDeposito,
 			   SUM(CASE WHEN status = 'RESTITUIDO' THEN 1 ELSE 0 END) AS restituidos,
 			   SUM(CASE WHEN caixa_id IS NULL THEN 1 ELSE 0 END) AS semCaixa
 			 FROM bens

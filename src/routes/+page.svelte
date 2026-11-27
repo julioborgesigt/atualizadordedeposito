@@ -15,15 +15,31 @@
 		{ value: 'RESTITUIDO', label: 'Restituído' },
 		{ value: 'RESTITUIDO_PARCIAL', label: 'Restituído parcial' },
 		{ value: 'PERICIA', label: 'Perícia (PEFOCE)' },
+		{ value: 'PERICIA_PARCIAL', label: 'Pefoce - Parcial' },
 		{ value: 'JUDICIARIO', label: 'Judiciário' },
 		{ value: 'DEPOSITO_JUDICIAL', label: 'Depósito Judicial' },
 		{ value: 'DESTRUIDO', label: 'Destruído' }
 	];
 
+	const STATUS_OPCOES_LOTE = STATUS_OPCOES.filter(
+		(st) => st.value !== 'PERICIA_PARCIAL' && st.value !== 'RESTITUIDO_PARCIAL'
+	);
+
 	let selecionados = $state<number[]>([]);
 	let processandoLote = $state(false);
 	let exportando = $state<'XLSX' | 'PDF' | 'PDF_SELECIONADOS' | null>(null);
 	let feedback = $state<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+
+	// Modal para movimentação parcial (Pefoce - Parcial / Restituído parcial)
+	let modalParcial = $state<{
+		bem: BemLista;
+		novoStatus: 'PERICIA_PARCIAL' | 'RESTITUIDO_PARCIAL';
+		selectEl: HTMLSelectElement;
+		quantidade: string;
+		detalhe: string;
+		erro: string | null;
+		salvando: boolean;
+	} | null>(null);
 
 	// Controle de procedimentos expandidos (recolhidos por padrão)
 	let procedimentosExpandidos = $state<Record<string, boolean>>({});
@@ -70,6 +86,7 @@
 				bem.status === 'EM_DEPOSITO' ||
 				bem.status === 'DEPOSITO_DP_IGT' ||
 				bem.status === 'EM_EXTRACAO' ||
+				bem.status === 'PERICIA_PARCIAL' ||
 				bem.status === 'RESTITUIDO_PARCIAL'
 			) {
 				grupo.emDeposito += 1;
@@ -289,6 +306,21 @@
 		const novoValor = selectEl.value;
 		if (novoValor === valorAnterior) return;
 
+		if (novoValor === 'PERICIA_PARCIAL' || novoValor === 'RESTITUIDO_PARCIAL') {
+			const qtdSugerida =
+				bem.qtd_disponivel >= 1 ? '1' : bem.qtd_disponivel > 0 ? String(bem.qtd_disponivel) : '';
+			modalParcial = {
+				bem,
+				novoStatus: novoValor,
+				selectEl,
+				quantidade: qtdSugerida,
+				detalhe: '',
+				erro: null,
+				salvando: false
+			};
+			return;
+		}
+
 		const labelAnterior = traduzirStatus(valorAnterior);
 		const labelNovo = traduzirStatus(novoValor);
 
@@ -314,6 +346,65 @@
 			const msg = e instanceof Error ? e.message : 'Erro ao alterar status.';
 			feedback = { tipo: 'erro', texto: msg };
 			tarefaStore.falhar('Erro ao alterar status', msg);
+		}
+	}
+
+	function cancelarModalParcial() {
+		if (!modalParcial || modalParcial.salvando) return;
+		modalParcial.selectEl.value = modalParcial.bem.status;
+		modalParcial = null;
+	}
+
+	async function confirmarModalParcial(e: SubmitEvent) {
+		e.preventDefault();
+		if (!modalParcial || modalParcial.salvando) return;
+
+		const { bem, novoStatus, selectEl } = modalParcial;
+		const qtd = Number(String(modalParcial.quantidade).replace(',', '.'));
+		const detalhe = modalParcial.detalhe.trim();
+
+		if (!Number.isFinite(qtd) || qtd <= 0) {
+			modalParcial.erro = 'Informe uma quantidade válida maior que zero.';
+			return;
+		}
+		if (bem.qtd_disponivel > 0 && qtd > bem.qtd_disponivel) {
+			modalParcial.erro = `A quantidade (${qtd}) não pode exceder o saldo disponível (${bem.qtd_disponivel} ${bem.unidade}).`;
+			return;
+		}
+		if (!detalhe) {
+			modalParcial.erro =
+				novoStatus === 'PERICIA_PARCIAL'
+					? 'Especifique o que está sendo encaminhado à PEFOCE.'
+					: 'Especifique o que está sendo restituído parcialmente.';
+			return;
+		}
+
+		modalParcial.erro = null;
+		modalParcial.salvando = true;
+		const labelNovo = traduzirStatus(novoStatus);
+		tarefaStore.iniciar(`Registrando ${labelNovo}...`, bem.descricao_original);
+
+		try {
+			await atualizarBem(bem.id, {
+				status: novoStatus,
+				qtd_movimentada: qtd,
+				detalhe_parcial: detalhe
+			});
+			modalParcial = null;
+			tarefaStore.concluir(
+				`${labelNovo} registrado!`,
+				`Retirado(s) ${qtd} ${bem.unidade} — ${detalhe}`,
+				{ autoFecharMs: 4500 }
+			);
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : 'Erro ao registrar movimentação parcial.';
+			if (modalParcial) {
+				modalParcial.erro = msg;
+				modalParcial.salvando = false;
+			} else {
+				selectEl.value = bem.status;
+			}
+			tarefaStore.falhar('Erro ao atualizar status', msg);
 		}
 	}
 
@@ -744,7 +835,7 @@
 			<div class="bulk-group">
 				<select bind:value={statusLote} aria-label="Novo status para os selecionados">
 					<option value="">Alterar status...</option>
-					{#each STATUS_OPCOES as st}
+					{#each STATUS_OPCOES_LOTE as st}
 						<option value={st.value}>{st.label}</option>
 					{/each}
 				</select>
@@ -935,6 +1026,9 @@
 											{#if bem.identificador_unico}
 												<div class="muted">ID: {bem.identificador_unico}</div>
 											{/if}
+											{#if bem.observacoes}
+												<div class="bem-obs">{bem.observacoes}</div>
+											{/if}
 										</td>
 										<td class="c-saldo" data-label="Saldo">
 											<span class="saldo"><strong>{bem.qtd_disponivel}</strong> / {bem.qtd_total} {bem.unidade}</span>
@@ -1075,6 +1169,101 @@
 			{/if}
 		</div>
 	</nav>
+{/if}
+
+{#if modalParcial}
+	{@const ehPefoce = modalParcial.novoStatus === 'PERICIA_PARCIAL'}
+	{@const qtdNum = Number(String(modalParcial.quantidade).replace(',', '.'))}
+	{@const saldoApos =
+		Number.isFinite(qtdNum) && qtdNum > 0
+			? Math.max(0, Number((modalParcial.bem.qtd_disponivel - qtdNum).toFixed(4)))
+			: modalParcial.bem.qtd_disponivel}
+
+	<div class="parcial-backdrop" role="presentation" onclick={cancelarModalParcial}>
+		<div
+			class="parcial-modal panel"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="modal-parcial-titulo"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && cancelarModalParcial()}
+		>
+			<div class="parcial-head">
+				<span class="badge {ehPefoce ? 'purple' : 'blue'}">
+					{ehPefoce ? 'Pefoce - Parcial' : 'Restituído parcial'}
+				</span>
+				<h2 id="modal-parcial-titulo">
+					{ehPefoce ? 'Encaminhamento parcial à PEFOCE' : 'Restituição parcial de item'}
+				</h2>
+				<p class="parcial-item-nome">{modalParcial.bem.descricao_original}</p>
+				<p class="parcial-saldo">
+					Saldo atual no depósito:
+					<strong>{modalParcial.bem.qtd_disponivel}</strong> / {modalParcial.bem.qtd_total} {modalParcial.bem.unidade}
+				</p>
+			</div>
+
+			{#if modalParcial.erro}
+				<div class="alert error" role="alert">{modalParcial.erro}</div>
+			{/if}
+
+			<form class="parcial-form" onsubmit={confirmarModalParcial}>
+				<div class="parcial-field">
+					<label for="parcial-qtd">
+						{ehPefoce
+							? `Quantidade retirada para a PEFOCE (${modalParcial.bem.unidade}) *`
+							: `Quantidade restituída (${modalParcial.bem.unidade}) *`}
+					</label>
+					<input
+						id="parcial-qtd"
+						type="number"
+						step="any"
+						min="0.01"
+						max={modalParcial.bem.qtd_disponivel > 0 ? modalParcial.bem.qtd_disponivel : undefined}
+						bind:value={modalParcial.quantidade}
+						required
+						disabled={modalParcial.salvando}
+					/>
+					<span class="parcial-preview">
+						Saldo restante no depósito após a operação:
+						<strong>{saldoApos}</strong> / {modalParcial.bem.qtd_total} {modalParcial.bem.unidade}
+					</span>
+				</div>
+
+				<div class="parcial-field">
+					<label for="parcial-detalhe">
+						{ehPefoce
+							? 'Especifique o que foi encaminhado à PEFOCE *'
+							: 'Especifique o que foi restituído parcialmente *'}
+					</label>
+					<textarea
+						id="parcial-detalhe"
+						rows="3"
+						bind:value={modalParcial.detalhe}
+						placeholder={ehPefoce
+							? 'Ex: 2 celulares Samsung enviados para extração na PEFOCE (Ofício nº 123/2026)'
+							: 'Ex: 1 aparelho celular restituído ao proprietário conforme termo de restituição'}
+						required
+						disabled={modalParcial.salvando}
+					></textarea>
+				</div>
+
+				<div class="parcial-actions">
+					<button
+						type="button"
+						class="btn btn-secondary"
+						disabled={modalParcial.salvando}
+						onclick={cancelarModalParcial}
+					>
+						Cancelar
+					</button>
+					<button type="submit" class="btn btn-primary" disabled={modalParcial.salvando}>
+						{modalParcial.salvando ? 'Salvando...' : 'Confirmar movimentação'}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
 {/if}
 
 <style>
@@ -1554,7 +1743,8 @@
 		color: var(--success);
 	}
 	.status-select.restituido_parcial,
-	.status-select.em_extracao {
+	.status-select.em_extracao,
+	.status-select.pericia_parcial {
 		background-color: var(--info-soft);
 		color: var(--info);
 	}
@@ -1567,6 +1757,81 @@
 	.status-select.destruido {
 		background-color: var(--danger-soft);
 		color: var(--danger);
+	}
+
+	.bem-obs {
+		margin-top: 0.3rem;
+		padding: 0.28rem 0.5rem;
+		border-left: 2.5px solid var(--primary);
+		background: var(--surface-2);
+		border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+		font-size: 0.77rem;
+		color: var(--text-2);
+		line-height: 1.4;
+		overflow-wrap: anywhere;
+	}
+
+	.parcial-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 80;
+		background: hsl(222 47% 10% / 0.54);
+		backdrop-filter: blur(2px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+	}
+	.parcial-modal {
+		width: 100%;
+		max-width: 480px;
+		padding: 1.45rem;
+		box-shadow: var(--shadow-lg);
+	}
+	.parcial-head h2 {
+		margin: 0.5rem 0 0.25rem;
+		font-size: 1.08rem;
+		font-weight: 700;
+	}
+	.parcial-item-nome {
+		margin: 0;
+		font-size: 0.86rem;
+		color: var(--text);
+		font-weight: 500;
+		overflow-wrap: anywhere;
+	}
+	.parcial-saldo {
+		margin: 0.35rem 0 1rem;
+		font-size: 0.82rem;
+		color: var(--text-2);
+	}
+	.parcial-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+	}
+	.parcial-field label {
+		display: block;
+		font-size: 0.8rem;
+		font-weight: 600;
+		margin-bottom: 0.35rem;
+	}
+	.parcial-field input,
+	.parcial-field textarea {
+		width: 100%;
+		resize: vertical;
+	}
+	.parcial-preview {
+		display: block;
+		margin-top: 0.3rem;
+		font-size: 0.78rem;
+		color: var(--text-2);
+	}
+	.parcial-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.55rem;
+		margin-top: 0.35rem;
 	}
 
 	/* Tablet */

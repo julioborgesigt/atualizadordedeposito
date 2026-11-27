@@ -52,7 +52,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 				 FROM bens b
 				 JOIN procedimentos p ON p.id = b.procedimento_id
 				 WHERE b.unidade_id = ?
-				   AND b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL')
+				   AND b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'PERICIA_PARCIAL', 'RESTITUIDO_PARCIAL')
 				   AND (
 				     p.numero_normalizado = ?
 				     OR p.procedimento_principal_id IN (SELECT id FROM procedimentos WHERE numero_normalizado = ? AND unidade_id = ?)

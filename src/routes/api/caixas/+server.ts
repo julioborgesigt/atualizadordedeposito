@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ platform, locals }) => {
 		.prepare(
 			`SELECT c.id, c.nome, c.setor, c.observacoes, c.criado_em, c.unidade_id, u.nome AS unidade_nome,
 			        COUNT(b.id) AS total_bens,
-			        SUM(CASE WHEN b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS em_deposito
+			        SUM(CASE WHEN b.status IN ('EM_DEPOSITO', 'DEPOSITO_DP_IGT', 'EM_EXTRACAO', 'PERICIA_PARCIAL', 'RESTITUIDO_PARCIAL') THEN 1 ELSE 0 END) AS em_deposito
 			 FROM caixas c
 			 LEFT JOIN unidades u ON u.id = c.unidade_id
 			 LEFT JOIN bens b ON b.caixa_id = c.id

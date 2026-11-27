@@ -61,7 +61,7 @@ export const GET: RequestHandler = async ({ url, platform, locals }) => {
 	const { results: bens } = await db
 		.prepare(
 			`SELECT b.id, b.categoria, b.descricao_original, b.identificador_unico,
-			        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id,
+			        b.qtd_total, b.qtd_disponivel, b.unidade, b.status, b.caixa_id, b.observacoes,
 			        p.tipo AS proc_tipo, p.numero_normalizado AS proc_numero, p.operacao,
 			        c.nome AS caixa_nome, u.nome AS unidade_nome
 			 FROM bens b

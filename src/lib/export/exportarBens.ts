@@ -15,6 +15,7 @@ const MAPA_STATUS: Record<string, string> = {
 	RESTITUIDO: 'Restituído',
 	RESTITUIDO_PARCIAL: 'Restituído parcial',
 	PERICIA: 'Perícia (PEFOCE)',
+	PERICIA_PARCIAL: 'Pefoce - Parcial',
 	JUDICIARIO: 'Judiciário',
 	DEPOSITO_JUDICIAL: 'Depósito Judicial',
 	DESTRUIDO: 'Destruído'
@@ -49,7 +50,8 @@ export async function exportarParaXlsx(
 		'Qtd. Total': bem.qtd_total,
 		Unidade: bem.unidade,
 		'Caixa / Local': bem.caixa_nome ?? 'Sem caixa',
-		Status: traduzirStatus(bem.status)
+		Status: traduzirStatus(bem.status),
+		'Observações': bem.observacoes ?? ''
 	}));
 
 	const ws = XLSX.utils.json_to_sheet(linhas);
@@ -64,7 +66,8 @@ export async function exportarParaXlsx(
 		{ wch: 12 }, // Qtd. Total
 		{ wch: 10 }, // Unidade
 		{ wch: 24 }, // Caixa / Local
-		{ wch: 18 }  // Status
+		{ wch: 18 }, // Status
+		{ wch: 42 }  // Observações
 	];
 
 	const wb = XLSX.utils.book_new();
@@ -120,7 +123,7 @@ export async function exportarParaPdf(
 	const body = bens.map((bem) => [
 		`${bem.proc_tipo} ${bem.proc_numero}${bem.operacao ? `\n(${bem.operacao})` : ''}`,
 		bem.categoria,
-		bem.descricao_original,
+		bem.observacoes ? `${bem.descricao_original}\nObs.: ${bem.observacoes}` : bem.descricao_original,
 		`${bem.qtd_disponivel} / ${bem.qtd_total} ${bem.unidade}`,
 		bem.caixa_nome ?? 'Sem caixa',
 		traduzirStatus(bem.status)
