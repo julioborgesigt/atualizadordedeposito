@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ensureSchema } from '$lib/server/db';
 import { exigirUnidade } from '$lib/server/auth';
+import { construirFiltroBusca } from '$lib/server/busca';
 import type { BemLista } from '../../../+page.server';
 
 export const GET: RequestHandler = async ({ url, platform, locals }) => {
@@ -31,28 +32,11 @@ export const GET: RequestHandler = async ({ url, platform, locals }) => {
 	}
 
 	if (q) {
-		const qLimpo = q.trim();
-		const termo = `%${qLimpo}%`;
-		const ehIpOuInquerito = /^(IP|INQU[EÉ]RITO(\s+POLICIAL)?)$/i.test(qLimpo);
-		const ehBo = /^(BO|BOLETIM(\s+DE\s+OCORR[EÊ]NCIA)?)$/i.test(qLimpo);
-		const ehTco = /^(TCO|TERMO\s+CIRCUNSTANCIADO)$/i.test(qLimpo);
-		const ehBocOuAi = /^(BOC|ATO\s+INFRACIONAL|AI)$/i.test(qLimpo);
-
-		let condTipoExtra = '';
-		if (ehIpOuInquerito) {
-			condTipoExtra = ` OR p.tipo IN ('IP', 'INQUÉRITO', 'INQUERITO')`;
-		} else if (ehBo) {
-			condTipoExtra = ` OR p.tipo IN ('BO')`;
-		} else if (ehTco) {
-			condTipoExtra = ` OR p.tipo IN ('TCO')`;
-		} else if (ehBocOuAi) {
-			condTipoExtra = ` OR p.tipo IN ('BOC', 'ATO INFRACIONAL')`;
+		const filtroBusca = construirFiltroBusca(q);
+		if (filtroBusca) {
+			where.push(filtroBusca.sql);
+			binds.push(...filtroBusca.binds);
 		}
-
-		where.push(
-			`(p.numero_normalizado LIKE ? OR p.tipo LIKE ? OR b.descricao_original LIKE ? OR b.identificador_unico LIKE ? OR p.operacao LIKE ? OR c.nome LIKE ?${condTipoExtra})`
-		);
-		binds.push(termo, termo, termo, termo, termo, termo);
 	}
 
 	if (status) {

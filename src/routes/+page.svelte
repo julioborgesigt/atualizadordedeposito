@@ -636,7 +636,12 @@
 	</div>
 {/if}
 
-<form method="GET" class="filtros panel" role="search">
+<form
+	method="GET"
+	class="filtros panel"
+	class:com-unidade={data.unidade?.role === 'ADMIN' && data.unidades.length > 0}
+	role="search"
+>
 	{#if data.paginacao.porPaginaOpcao && data.paginacao.porPaginaOpcao !== '10'}
 		<input type="hidden" name="porPagina" value={data.paginacao.porPaginaOpcao} />
 	{/if}
@@ -647,8 +652,8 @@
 			type="search"
 			name="q"
 			value={data.filtros.q}
-			placeholder="Buscar por procedimento (BO, Inquérito, TCO...), IMEI, placa, cartão, descrição..."
-			aria-label="Buscar bens"
+			placeholder="Buscar procedimento, item apreendido, parte, IMEI, caixa..."
+			aria-label="Buscar bens e apreensões"
 		/>
 	</div>
 	{#if data.unidade?.role === 'ADMIN' && data.unidades.length > 0}
@@ -1143,11 +1148,14 @@
 	/* Filtros */
 	.filtros {
 		display: grid;
-		grid-template-columns: minmax(240px, 2.2fr) repeat(3, minmax(160px, 1fr)) auto;
+		grid-template-columns: minmax(170px, 1.5fr) repeat(3, minmax(150px, 1fr)) auto;
 		gap: 0.6rem;
 		align-items: center;
 		padding: 0.85rem;
 		margin-bottom: 1rem;
+	}
+	.filtros.com-unidade {
+		grid-template-columns: minmax(165px, 1.5fr) repeat(4, minmax(130px, 1fr)) auto;
 	}
 	.f-busca {
 		position: relative;
@@ -1563,7 +1571,8 @@
 
 	/* Tablet */
 	@media (max-width: 1080px) {
-		.filtros {
+		.filtros,
+		.filtros.com-unidade {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 		.f-busca {
@@ -1606,7 +1615,8 @@
 			font-size: 0.72rem;
 		}
 
-		.filtros {
+		.filtros,
+		.filtros.com-unidade {
 			grid-template-columns: 1fr;
 			padding: 0.75rem;
 		}

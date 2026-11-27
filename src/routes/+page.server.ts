@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import type { StatusBem } from '$lib/types';
 import { ensureSchema, limparResquiciosOrfaos } from '$lib/server/db';
+import { construirFiltroBusca } from '$lib/server/busca';
 
 export type PorPaginaOpcao = '10' | '20' | '50' | '100' | 'todos';
 
@@ -120,28 +121,11 @@ export const load: PageServerLoad = async ({ url, platform, locals }) => {
 	}
 
 	if (q) {
-		const qLimpo = q.trim();
-		const termo = `%${qLimpo}%`;
-		const ehIpOuInquerito = /^(IP|INQU[EÉ]RITO(\s+POLICIAL)?)$/i.test(qLimpo);
-		const ehBo = /^(BO|BOLETIM(\s+DE\s+OCORR[EÊ]NCIA)?)$/i.test(qLimpo);
-		const ehTco = /^(TCO|TERMO\s+CIRCUNSTANCIADO)$/i.test(qLimpo);
-		const ehBocOuAi = /^(BOC|ATO\s+INFRACIONAL|AI)$/i.test(qLimpo);
-
-		let condTipoExtra = '';
-		if (ehIpOuInquerito) {
-			condTipoExtra = ` OR p.tipo IN ('IP', 'INQUÉRITO', 'INQUERITO')`;
-		} else if (ehBo) {
-			condTipoExtra = ` OR p.tipo IN ('BO')`;
-		} else if (ehTco) {
-			condTipoExtra = ` OR p.tipo IN ('TCO')`;
-		} else if (ehBocOuAi) {
-			condTipoExtra = ` OR p.tipo IN ('BOC', 'ATO INFRACIONAL')`;
+		const filtroBusca = construirFiltroBusca(q);
+		if (filtroBusca) {
+			where.push(filtroBusca.sql);
+			binds.push(...filtroBusca.binds);
 		}
-
-		where.push(
-			`(p.numero_normalizado LIKE ? OR p.tipo LIKE ? OR b.descricao_original LIKE ? OR b.identificador_unico LIKE ? OR p.operacao LIKE ? OR c.nome LIKE ?${condTipoExtra})`
-		);
-		binds.push(termo, termo, termo, termo, termo, termo);
 	}
 
 	if (status) {
