@@ -16,6 +16,7 @@
 		{ value: 'RESTITUIDO_PARCIAL', label: 'Restituído parcial' },
 		{ value: 'PERICIA', label: 'Perícia (PEFOCE)' },
 		{ value: 'JUDICIARIO', label: 'Judiciário' },
+		{ value: 'DEPOSITO_JUDICIAL', label: 'Depósito Judicial' },
 		{ value: 'DESTRUIDO', label: 'Destruído' }
 	];
 
@@ -1550,7 +1551,8 @@
 		color: var(--info);
 	}
 	.status-select.pericia,
-	.status-select.judiciario {
+	.status-select.judiciario,
+	.status-select.deposito_judicial {
 		background-color: var(--violet-soft);
 		color: var(--violet);
 	}

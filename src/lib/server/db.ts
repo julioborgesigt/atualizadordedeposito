@@ -78,18 +78,7 @@ export async function ensureSchema(db: D1Database, adminInitialPassword?: string
 			qtd_total REAL NOT NULL DEFAULT 1,
 			qtd_disponivel REAL NOT NULL DEFAULT 1,
 			unidade TEXT NOT NULL DEFAULT 'UN',
-			status TEXT NOT NULL DEFAULT 'EM_DEPOSITO' CHECK (
-				status IN (
-					'EM_DEPOSITO',
-					'DEPOSITO_DP_IGT',
-					'EM_EXTRACAO',
-					'RESTITUIDO_PARCIAL',
-					'RESTITUIDO',
-					'PERICIA',
-					'JUDICIARIO',
-					'DESTRUIDO'
-				)
-			),
+			status TEXT NOT NULL DEFAULT 'EM_DEPOSITO',
 			observacoes TEXT,
 			unidade_id INTEGER REFERENCES unidades(id),
 			criado_em TEXT NOT NULL DEFAULT (datetime('now')),
@@ -122,6 +111,79 @@ export async function ensureSchema(db: D1Database, adminInitialPassword?: string
 	await garantirColunaUnidade(db, 'procedimentos');
 	await garantirColunaUnidade(db, 'documentos');
 	await garantirColunaUnidade(db, 'bens');
+
+	// Migração segura no D1 para liberar novos valores de status em bens (ex: DEPOSITO_JUDICIAL):
+	// faz backup explícito de movimentacoes antes de recriar bens, evitando ON DELETE CASCADE no D1.
+	const rowBensSchema = await db
+		.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bens'`)
+		.first<{ sql: string }>();
+
+	if (
+		rowBensSchema?.sql &&
+		rowBensSchema.sql.includes('EM_DEPOSITO') &&
+		rowBensSchema.sql.includes('DESTRUIDO') &&
+		!rowBensSchema.sql.includes('DEPOSITO_JUDICIAL')
+	) {
+		await db.batch([
+			db.prepare(`DROP TABLE IF EXISTS movimentacoes_backup`),
+			db.prepare(`CREATE TABLE movimentacoes_backup AS SELECT * FROM movimentacoes`),
+			db.prepare(`DELETE FROM movimentacoes`),
+			db.prepare(`ALTER TABLE bens RENAME TO bens_old`),
+			db.prepare(`CREATE TABLE bens (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				procedimento_id INTEGER NOT NULL REFERENCES procedimentos(id) ON DELETE CASCADE,
+				caixa_id INTEGER REFERENCES caixas(id) ON DELETE SET NULL,
+				categoria TEXT NOT NULL DEFAULT 'DIVERSO',
+				descricao_original TEXT NOT NULL,
+				descricao_normalizada TEXT NOT NULL,
+				tipo_identificador TEXT CHECK (tipo_identificador IN ('IMEI', 'PLACA', 'CARTAO', 'CNPJ', 'SERIE')),
+				identificador_unico TEXT,
+				qtd_total REAL NOT NULL DEFAULT 1,
+				qtd_disponivel REAL NOT NULL DEFAULT 1,
+				unidade TEXT NOT NULL DEFAULT 'UN',
+				status TEXT NOT NULL DEFAULT 'EM_DEPOSITO',
+				observacoes TEXT,
+				unidade_id INTEGER REFERENCES unidades(id),
+				criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+				atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+			)`),
+			db.prepare(`INSERT INTO bens (
+				id, procedimento_id, caixa_id, categoria, descricao_original, descricao_normalizada,
+				tipo_identificador, identificador_unico, qtd_total, qtd_disponivel, unidade,
+				status, observacoes, unidade_id, criado_em, atualizado_em
+			) SELECT
+				id, procedimento_id, caixa_id, categoria, descricao_original, descricao_normalizada,
+				tipo_identificador, identificador_unico, qtd_total, qtd_disponivel, unidade,
+				status, observacoes, unidade_id, criado_em, atualizado_em
+			FROM bens_old`),
+			db.prepare(`DROP TABLE movimentacoes`),
+			db.prepare(`DROP TABLE bens_old`),
+			db.prepare(`CREATE TABLE movimentacoes (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				bem_id INTEGER NOT NULL REFERENCES bens(id) ON DELETE CASCADE,
+				documento_id INTEGER REFERENCES documentos(id) ON DELETE SET NULL,
+				tipo_evento TEXT NOT NULL CHECK (
+					tipo_evento IN ('APREENSAO', 'RESTITUICAO', 'PERICIA', 'JUDICIARIO', 'DESTRUICAO', 'AJUSTE_MANUAL')
+				),
+				qtd_movimentada REAL NOT NULL DEFAULT 1,
+				data_evento TEXT,
+				parte_nome TEXT,
+				parte_cpf TEXT,
+				observacoes TEXT,
+				criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+			)`),
+			db.prepare(`INSERT INTO movimentacoes (
+				id, bem_id, documento_id, tipo_evento, qtd_movimentada, data_evento, parte_nome, parte_cpf, observacoes, criado_em
+			) SELECT
+				id, bem_id, documento_id, tipo_evento, qtd_movimentada, data_evento, parte_nome, parte_cpf, observacoes, criado_em
+			FROM movimentacoes_backup`),
+			db.prepare(`DROP TABLE movimentacoes_backup`),
+			db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_proc ON bens(procedimento_id)`),
+			db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_status ON bens(status)`),
+			db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_id_unico ON bens(identificador_unico)`),
+			db.prepare(`CREATE INDEX IF NOT EXISTS idx_bens_desc_norm ON bens(descricao_normalizada)`)
+		]);
+	}
 
 	await db.batch([
 		db.prepare(`CREATE INDEX IF NOT EXISTS idx_caixas_unidade ON caixas(unidade_id)`),

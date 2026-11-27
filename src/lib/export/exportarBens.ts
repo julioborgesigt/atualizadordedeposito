@@ -16,6 +16,7 @@ const MAPA_STATUS: Record<string, string> = {
 	RESTITUIDO_PARCIAL: 'Restituído parcial',
 	PERICIA: 'Perícia (PEFOCE)',
 	JUDICIARIO: 'Judiciário',
+	DEPOSITO_JUDICIAL: 'Depósito Judicial',
 	DESTRUIDO: 'Destruído'
 };
 

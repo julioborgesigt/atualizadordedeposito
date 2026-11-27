@@ -10,6 +10,7 @@ export type StatusBem =
 	| 'RESTITUIDO'
 	| 'PERICIA'
 	| 'JUDICIARIO'
+	| 'DEPOSITO_JUDICIAL'
 	| 'DESTRUIDO';
 
 export interface ItemExtraido {
